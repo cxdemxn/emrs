@@ -32,6 +32,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 // Import the DraggableCourse and DroppableTimeSlot components
 import { DraggableCourse, DroppableTimeSlot } from './components';
+import console from 'console';
 
 // API URL
 const API_URL = 'http://localhost:5000/api';
@@ -222,7 +223,6 @@ const TimetableScheduler: React.FC = () => {
       
       setLoading(false);
     } catch (err) {
-      console.error('Error fetching data:', err);
       setError('Failed to load timetable data. Please try again.');
       setLoading(false);
       setSnackbarMessage('Failed to load timetable data');
@@ -343,22 +343,39 @@ const TimetableScheduler: React.FC = () => {
     // Count exams for this department-level on this day
     const examCount = countExamsForDepartmentLevelOnDay(course.department.id, course.level, day);
     
-    // Check if there's already a course scheduled in this time slot on this day
+    // Check if this department-level already has an exam in this time slot on this day
     const timeSlotConflict = scheduledCourses.some(sc => 
       sc.day.toDateString() === day.toDateString() && 
-      sc.timeSlot === timeSlot
+      sc.timeSlot === timeSlot &&
+      sc.course.department.id === course.department.id &&
+      sc.course.level === course.level
     );
     
     if (timeSlotConflict) {
-      return 'error'; // Cannot schedule two exams in the same time slot
+      return 'error'; // Cannot schedule two exams from the same department-level in the same time slot
     }
     
+    // Check for forced break day: if the previous weekday had 2+ exams for this department-level
+    // Find the previous weekday
+    let prevDay = new Date(day);
+    prevDay.setDate(prevDay.getDate() - 1);
+    // Skip weekends when looking for previous weekday
+    while (isWeekend(prevDay)) {
+      prevDay.setDate(prevDay.getDate() - 1);
+    }
+    
+    const prevDayExamCount = countExamsForDepartmentLevelOnDay(course.department.id, course.level, prevDay);
+    if (prevDayExamCount >= 2) {
+      return 'error'; // Forced break day after a department-level had 2+ exams
+    }
+    
+    // Check max exams per day per department-level
     if (examCount >= 3) {
       return 'error'; // Max 3 exams per department-level per day
     }
     
     if (examCount === 2) {
-      return 'warning'; // Warning at 3 exams
+      return 'warning'; // Warning at 3rd exam
     }
     
     return 'none';
@@ -380,7 +397,7 @@ const TimetableScheduler: React.FC = () => {
         `${API_URL}/timetables/${timetable.id}/auto-schedule`,
         { departmentIds, levels }
       );
-      
+      console.log('we get here ')
       // Convert returned exam slots to scheduled courses
       if (response.data.examSlots && response.data.examSlots.length > 0) {
         console.log('Auto-scheduled exam slots:', response.data.examSlots);
@@ -415,7 +432,6 @@ const TimetableScheduler: React.FC = () => {
         setSnackbarOpen(true);
       }
     } catch (error) {
-      console.error('Auto-scheduling error:', error);
       setSnackbarMessage('Failed to auto-schedule exams');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
@@ -423,6 +439,14 @@ const TimetableScheduler: React.FC = () => {
       setIsAutoScheduling(false);
     }
   };
+  
+  // Update course tree when scheduled courses change
+  useEffect(() => {
+    if (courses.length && departments.length && faculties.length) {
+      const tree = buildCourseTree();
+      setCourseTree(tree);
+    }
+  }, [scheduledCourses, courses, departments, faculties]);
   
   // Handle course drop (drag and drop scheduling)
   const handleCourseDrop = async (courseId: string, day: Date, timeSlot: string) => {
@@ -475,7 +499,6 @@ const TimetableScheduler: React.FC = () => {
         setSnackbarOpen(true);
       }
     } catch (error) {
-      console.error('Error scheduling course:', error);
       setSnackbarMessage('Failed to schedule course');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
@@ -498,7 +521,6 @@ const handleRemoveCourse = async (scheduledCourseId: string) => {
     setSnackbarSeverity('success');
     setSnackbarOpen(true);
   } catch (error) {
-    console.error('Error removing course:', error);
     setSnackbarMessage('Failed to remove course from schedule');
     setSnackbarSeverity('error');
     setSnackbarOpen(true);
@@ -523,7 +545,6 @@ const handleSaveDraft = async () => {
     setSnackbarSeverity('success');
     setSnackbarOpen(true);
   } catch (error) {
-    console.error('Error saving draft:', error);
     setSnackbarMessage('Failed to save timetable draft');
     setSnackbarSeverity('error');
     setSnackbarOpen(true);
@@ -569,7 +590,6 @@ const confirmPublish = async () => {
       navigate('/admin/timetables', { replace: true });
     }, 2000);
   } catch (error) {
-    console.error('Error publishing timetable:', error);
     setSnackbarMessage('Failed to publish timetable');
     setSnackbarSeverity('error');
     setSnackbarOpen(true);
@@ -783,7 +803,7 @@ if (!timetable) {
                         fontSize: '0.85rem'
                       }}
                     >
-                      {timeSlot}
+                      {TIME_SLOT_MAP[timeSlot]}
                     </Box>
                     
                     {/* Calendar cells for this time slot */}

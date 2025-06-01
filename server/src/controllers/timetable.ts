@@ -542,245 +542,361 @@ export const removeExamSlot = async (req: Request, res: Response) => {
   }
 };
 
-// Auto-schedule exams
+/**
+ * Auto-schedules exams with these rules:
+ * 1) Each department-level may have up to 2 exams/day. If absolutely necessary, a third is allowed.
+ * 2) Once a department-level hits 2 exams on Date D, its next weekday (D+1) is forced to be a break (no exams).
+ * 3) No department-level may have 2 exams in the same time slot on the same day.
+ * 4) Different department-levels may share the same (date, timeSlot).
+ * 5) Return any courses that truly cannot fit (even under 3/day), so the front end can place them manually.
+ */
 export const autoScheduleExams = async (req: Request, res: Response) => {
   Logger.info('Starting auto-scheduling of exams');
+
   try {
-    const { id } = req.params;
+    const { id } = req.params; // timetable ID
     const { departmentIds, levels } = req.body;
 
-    // Validate input
-    if (!departmentIds || !Array.isArray(departmentIds) || departmentIds.length === 0) {
-      return res.status(400).json({ message: 'At least one department ID is required' });
+    // ─── 1) Input Validation ─────────────────────────────────────────────
+    if (!Array.isArray(departmentIds) || departmentIds.length === 0) {
+      res.status(400).json({ message: 'At least one department ID is required' });
     }
-
-    if (!levels || !Array.isArray(levels) || levels.length === 0) {
-      return res.status(400).json({ message: 'At least one level is required' });
+    if (!Array.isArray(levels) || levels.length === 0) {
+      res.status(400).json({ message: 'At least one level is required' });
     }
-
-    // Validate levels
-    for (const level of levels) {
-      if (![100, 200, 300, 400].includes(level)) {
-        return res.status(400).json({ message: 'Levels must be 100, 200, 300, or 400' });
+    for (const lvl of levels) {
+      if (![100, 200, 300, 400].includes(lvl)) {
+        res.status(400).json({ message: 'Levels must be 100, 200, 300, or 400' });
       }
     }
 
-    // Check if timetable exists
-    const timetable = await prisma.timetable.findUnique({
-      where: { id }
-    });
-
+    // ─── 2) Fetch Timetable & Prevent Updates if Published ───────────────
+    const timetable = await prisma.timetable.findUnique({ where: { id } });
     if (!timetable) {
-      return res.status(404).json({ message: 'Timetable not found' });
+      res.status(404).json({ message: 'Timetable not found' });
+      return
     }
-
-    // If timetable is published, prevent updates
     if (timetable.isPublished) {
-      return res.status(400).json({ message: 'Cannot update a published timetable' });
+      res.status(400).json({ message: 'Cannot update a published timetable' });
+      return
     }
 
-    // Get all courses for the specified departments and levels
+    // ─── 3) Fetch All Courses for Given Departments & Levels ─────────────
     Logger.debug('Fetching all courses for scheduling');
     const courses = await prisma.course.findMany({
       where: {
-        departmentId: {
-          in: departmentIds
-        },
-        level: {
-          in: levels
-        }
+        departmentId: { in: departmentIds },
+        level: { in: levels }
       },
-      include: {
-        department: true
-      }
+      include: { department: true }
     });
-
     if (courses.length === 0) {
-      return res.status(404).json({ message: 'No courses found for the specified departments and levels' });
+      res.status(404).json({ message: 'No courses found for the specified departments and levels' });
+      return
     }
 
-    // Get all weekdays between start and end date
+    // ─── 4) Build Chronologically Sorted Weekdays Array ─────────────────
     const availableDates = getWeekdaysBetweenDates(timetable.startDate, timetable.endDate);
     Logger.debug(`Found ${availableDates.length} weekdays for scheduling`);
-
     if (availableDates.length === 0) {
-      return res.status(400).json({ message: 'No weekdays available in the timetable date range' });
+      res.status(400).json({ message: 'No weekdays available in the timetable date range' });
+      return
     }
+    availableDates.sort((a, b) => a.getTime() - b.getTime());
+    const sortedDateKeys = availableDates.map((d) => d.toISOString().slice(0, 10)); // e.g. "2025-05-12"
 
-    // Get existing exam slots
-    Logger.debug(`Fetching existing exam slots for timetable: ${id}`);
+    // ─── 5) Fetch Existing ExamSlots & Build In-Memory Maps ─────────────
+    Logger.debug(`Fetching existing exam slots for timetable ID: ${id}`);
     const existingSlots = await prisma.examSlot.findMany({
-      where: {
-        timetableId: id
+      where: { timetableId: id },
+      include: {
+        course: { select: { departmentId: true, level: true } }
       }
     });
 
-    // Create a map of taken slots
-    const takenSlots = new Map<string, Set<TimeSlot>>();
+    // Map A: dateKey "YYYY-MM-DD" → Map<deptLevelKey, count>
+    //    deptLevelKey = "<deptId>-<level>"
+    const examCountsOnDate = new Map<string, Map<string, number>>();
+
+    // Map B: "<deptId>-<level>-<YYYY-MM-DD>" → Set<TimeSlot>
+    //    Tracks which timeslots are already used by that dept-level on that date.
+    const usedSlotsByDeptLevelOnDate = new Map<string, Set<TimeSlot>>();
+
+    // Populate both maps from existingSlots
     for (const slot of existingSlots) {
-      const dateKey = slot.date.toISOString().split('T')[0];
-      if (!takenSlots.has(dateKey)) {
-        takenSlots.set(dateKey, new Set<TimeSlot>());
+      const dateKey = slot.date.toISOString().slice(0, 10);
+      const deptId = slot.course.departmentId;
+      const lvl = slot.course.level;
+      const shortDeptLvl = `${deptId}-${lvl}`;             // e.g. "42-300"
+      const longDeptLvlDateKey = `${shortDeptLvl}-${dateKey}`; // e.g. "42-300-2025-05-12"
+
+      // ─ Update examCountsOnDate
+      if (!examCountsOnDate.has(dateKey)) {
+        examCountsOnDate.set(dateKey, new Map<string, number>());
       }
-      takenSlots.get(dateKey)!.add(slot.timeSlot);
+      const dateMap = examCountsOnDate.get(dateKey)!;
+      dateMap.set(shortDeptLvl, (dateMap.get(shortDeptLvl) || 0) + 1);
+
+      // ─ Update usedSlotsByDeptLevelOnDate
+      if (!usedSlotsByDeptLevelOnDate.has(longDeptLvlDateKey)) {
+        usedSlotsByDeptLevelOnDate.set(longDeptLvlDateKey, new Set<TimeSlot>());
+      }
+      usedSlotsByDeptLevelOnDate.get(longDeptLvlDateKey)!.add(slot.timeSlot);
     }
 
-    // Create a map to track exams per department-level per day
-    const examsPerDepartmentLevelPerDay = new Map<string, Map<string, number>>();
-
-    // Group courses by department and level
-    const coursesByDepartmentLevel = new Map<string, Array<typeof courses[0]>>();
-    for (const course of courses) {
-      const key = `${course.departmentId}-${course.level}`;
-      if (!coursesByDepartmentLevel.has(key)) {
-        coursesByDepartmentLevel.set(key, []);
+    // ─── 6) Group Courses by "<deptId>-<level>" ─────────────────────────
+    interface CourseInfo {
+      id: string;
+      code: string;
+      title: string; // Changed from name to title to match actual course structure
+      departmentId: string; // Changed from number to string to match actual type
+      level: number;
+      department: { id: string; name: string }; // Changed id from number to string
+    }
+    const coursesByDeptLevel = new Map<string, CourseInfo[]>();
+    for (const c of courses as CourseInfo[]) {
+      const key = `${c.departmentId}-${c.level}`;
+      if (!coursesByDeptLevel.has(key)) {
+        coursesByDeptLevel.set(key, []);
       }
-      coursesByDepartmentLevel.get(key)!.push(course);
+      coursesByDeptLevel.get(key)!.push(c);
     }
 
-    // Schedule exams
-    const scheduledExams = [];
-    const timeSlots = Object.values(TimeSlot);
+    // ─── 7) Build skipSet for Forced Break-Days ───────────────────────────
+    // skipSet contains strings of format "<deptLevelKey>:<dateKeyToSkip>"
+    // e.g. "42-300:2025-05-13" means dept 42 lvl 300 must skip May 13.
+    const skipSet = new Set<string>();
 
-    // Process each department-level group
-    for (const [key, departmentLevelCourses] of coursesByDepartmentLevel.entries()) {
-      // Shuffle dates to distribute exams evenly
-      const shuffledDates = [...availableDates].sort(() => Math.random() - 0.5);
-      
-      for (const course of departmentLevelCourses) {
-        let scheduled = false;
-        
-        // Try to find a suitable date and time slot
-        for (const date of shuffledDates) {
-          const dateKey = date.toISOString().split('T')[0];
-          const departmentLevelDateKey = `${key}-${dateKey}`;
-          
-          // Initialize exam count for this department-level-date if not exists
-          if (!examsPerDepartmentLevelPerDay.has(departmentLevelDateKey)) {
-            examsPerDepartmentLevelPerDay.set(departmentLevelDateKey, new Map<string, number>());
-          }
-          
-          const examCount = await countExamsForDepartmentLevelOnDate(
-            course.departmentId,
-            course.level,
-            date,
-            id
-          );
-          
-          // Skip if already at max exams per day (2 preferred, 3 max)
-          if (examCount >= 2) {
+    // Pre-populate skipSet from existing counts (count ≥ 2 → skip next day)
+    for (let i = 0; i < sortedDateKeys.length; i++) {
+      const dateKey = sortedDateKeys[i];
+      const dateMap = examCountsOnDate.get(dateKey);
+      if (!dateMap) continue;
+
+      for (const [deptLevelKey, count] of dateMap.entries()) {
+        if (count >= 2 && i + 1 < sortedDateKeys.length) {
+          const nextDateKey = sortedDateKeys[i + 1];
+          skipSet.add(`${deptLevelKey}:${nextDateKey}`);
+        }
+      }
+    }
+
+    // ─── 8) Main Scheduling: Round-Robin + Break-Days + Fallback 3/day ───
+    const scheduledExams: Array<{ date: Date; timeSlot: TimeSlot; courseId: string; timetableId: string }> = [];
+    const unscheduled: CourseInfo[] = [];
+
+    // All possible time slots
+    const allTimeSlots: TimeSlot[] = Object.values(TimeSlot) as TimeSlot[];
+
+    // Iterate one department-level group at a time
+    for (const [deptLevelKey, courseList] of coursesByDeptLevel.entries()) {
+      // deptLevelKey = "<deptId>-<level>"
+      const [deptIdStr, lvlStr] = deptLevelKey.split('-');
+      const deptId = parseInt(deptIdStr, 10);
+      const lvl = parseInt(lvlStr, 10);
+
+      // Shuffle this dept-level's courses so placement order is random
+      const shuffledCourses = [...courseList].sort(() => Math.random() - 0.5);
+      let datePointer = 0;
+
+      // ── FIRST PASS: Place up to 2 exams/day (with forced-break logic)
+      for (const course of shuffledCourses) {
+        let placed = false;
+
+        for (let tries = 0; tries < sortedDateKeys.length; tries++, datePointer++) {
+          const dateKey = sortedDateKeys[datePointer % sortedDateKeys.length];
+          const shortDeptLvl = `${deptId}-${lvl}`;                  // e.g. "42-300"
+          const longDeptLvlDateKey = `${shortDeptLvl}-${dateKey}`;  // e.g. "42-300-2025-05-12"
+
+          // 1) Skip forced-break days
+          if (skipSet.has(`${shortDeptLvl}:${dateKey}`)) {
+            skipSet.delete(`${shortDeptLvl}:${dateKey}`);
             continue;
           }
-          
-          // Try each time slot
-          for (const slot of timeSlots) {
-            // Skip if slot is already taken
-            if (takenSlots.has(dateKey) && takenSlots.get(dateKey)!.has(slot)) {
-              continue;
-            }
-            
-            // Schedule the exam
-            scheduledExams.push({
-              date,
-              timeSlot: slot,
-              courseId: course.id,
-              timetableId: id
-            });
-            
-            // Mark slot as taken
-            if (!takenSlots.has(dateKey)) {
-              takenSlots.set(dateKey, new Set<TimeSlot>());
-            }
-            takenSlots.get(dateKey)!.add(slot);
-            
-            // Increment exam count
-            examsPerDepartmentLevelPerDay.get(departmentLevelDateKey)!.set(course.id, 1);
-            
-            scheduled = true;
-            break;
+
+          // 2) Check how many exams this dept-level has on dateKey
+          const dateMap = examCountsOnDate.get(dateKey) ?? new Map<string, number>();
+          const currentCount = dateMap.get(shortDeptLvl) || 0;
+          if (currentCount >= 2) {
+            continue;
           }
-          
-          if (scheduled) {
-            break;
+
+          // 3) Check which timeslots are already used by this dept-level on dateKey
+          const usedSlots = usedSlotsByDeptLevelOnDate.get(longDeptLvlDateKey) ?? new Set<TimeSlot>();
+
+          // 4) Shuffle the four slots and pick the first free one
+          const shuffledSlots = [...allTimeSlots].sort(() => Math.random() - 0.5);
+          const freeSlot = shuffledSlots.find(slot => !usedSlots.has(slot));
+          if (!freeSlot) {
+            // No free timeslot for this dept-level on that date → skip date
+            continue;
           }
+
+          // 5a) Increment examCountsOnDate
+          if (!examCountsOnDate.has(dateKey)) {
+            examCountsOnDate.set(dateKey, new Map<string, number>());
+          }
+          const updatedCount = currentCount + 1;
+          examCountsOnDate.get(dateKey)!.set(shortDeptLvl, updatedCount);
+
+          // 5b) Mark that freeSlot is now used by this dept-level on that date
+          if (!usedSlotsByDeptLevelOnDate.has(longDeptLvlDateKey)) {
+            usedSlotsByDeptLevelOnDate.set(longDeptLvlDateKey, new Set<TimeSlot>());
+          }
+          usedSlotsByDeptLevelOnDate.get(longDeptLvlDateKey)!.add(freeSlot);
+
+          // 5c) If updatedCount reached 2, force-break next date
+          if (updatedCount >= 2) {
+            const idx = sortedDateKeys.indexOf(dateKey);
+            if (idx >= 0 && idx + 1 < sortedDateKeys.length) {
+              const nextDateKey = sortedDateKeys[idx + 1];
+              skipSet.add(`${shortDeptLvl}:${nextDateKey}`);
+            }
+          }
+
+          // 5d) Actually schedule the exam
+          scheduledExams.push({
+            date: new Date(dateKey),
+            timeSlot: freeSlot,
+            courseId: course.id,
+            timetableId: id
+          });
+
+          placed = true;
+          break;
         }
-        
-        // If still not scheduled, try again with max 3 exams per day
-        if (!scheduled) {
-          for (const date of shuffledDates) {
-            const dateKey = date.toISOString().split('T')[0];
-            const departmentLevelDateKey = `${key}-${dateKey}`;
-            
-            const examCount = await countExamsForDepartmentLevelOnDate(
-              course.departmentId,
-              course.level,
-              date,
-              id
-            );
-            
-            // Skip if already at absolute max exams per day
-            if (examCount >= 3) {
-              continue;
-            }
-            
-            // Try each time slot
-            for (const slot of timeSlots) {
-              // Skip if slot is already taken
-              if (takenSlots.has(dateKey) && takenSlots.get(dateKey)!.has(slot)) {
-                continue;
-              }
-              
-              // Schedule the exam
-              scheduledExams.push({
-                date,
-                timeSlot: slot,
-                courseId: course.id,
-                timetableId: id
-              });
-              
-              // Mark slot as taken
-              if (!takenSlots.has(dateKey)) {
-                takenSlots.set(dateKey, new Set<TimeSlot>());
-              }
-              takenSlots.get(dateKey)!.add(slot);
-              
-              // Increment exam count
-              examsPerDepartmentLevelPerDay.get(departmentLevelDateKey)!.set(course.id, 1);
-              
-              scheduled = true;
-              break;
-            }
-            
-            if (scheduled) {
-              break;
-            }
-          }
+
+        if (!placed) {
+          // Could not place under ≤2/day → queue for fallback
+          unscheduled.push(course);
         }
       }
-    }
 
-    // Create exam slots in database
-    Logger.info(`Attempting to schedule ${scheduledExams.length} exams`);
-    const createdExamSlots = await prisma.$transaction(
-      scheduledExams.map(exam => 
-        prisma.examSlot.create({
-          data: exam,
-          include: {
-            course: {
-              include: {
-                department: true
-              }
+      // ── SECOND PASS (Fallback): Allow up to 3 exams/day
+      const fallbackCandidates = [...unscheduled];
+      unscheduled.length = 0;
+
+      for (const course of fallbackCandidates) {
+        let placed = false;
+
+        for (const dateKey of sortedDateKeys) {
+          const shortDeptLvl = `${deptId}-${lvl}`;
+          const longDeptLvlDateKey = `${shortDeptLvl}-${dateKey}`;
+
+          // 1) Skip forced-break days
+          if (skipSet.has(`${shortDeptLvl}:${dateKey}`)) {
+            skipSet.delete(`${shortDeptLvl}:${dateKey}`);
+            continue;
+          }
+
+          // 2) Check current per-day count
+          const dateMap = examCountsOnDate.get(dateKey) ?? new Map<string, number>();
+          const currentCount = dateMap.get(shortDeptLvl) || 0;
+          if (currentCount >= 3) {
+            continue; // cannot exceed 3 even in fallback
+          }
+
+          // 3) Check used slots for this dept-level on dateKey
+          const usedSlots = usedSlotsByDeptLevelOnDate.get(longDeptLvlDateKey) ?? new Set<TimeSlot>();
+
+          // 4) Shuffle slots and pick the first free one
+          const shuffledSlots = [...allTimeSlots].sort(() => Math.random() - 0.5);
+          const freeSlot = shuffledSlots.find(slot => !usedSlots.has(slot));
+          if (!freeSlot) {
+            continue; // all 4 slots are taken by this dept-level → skip date
+          }
+
+          // 5a) Update examCountsOnDate
+          if (!examCountsOnDate.has(dateKey)) {
+            examCountsOnDate.set(dateKey, new Map<string, number>());
+          }
+          const newCount = currentCount + 1;
+          examCountsOnDate.get(dateKey)!.set(shortDeptLvl, newCount);
+
+          // 5b) Update usedSlotsByDeptLevelOnDate
+          if (!usedSlotsByDeptLevelOnDate.has(longDeptLvlDateKey)) {
+            usedSlotsByDeptLevelOnDate.set(longDeptLvlDateKey, new Set<TimeSlot>());
+          }
+          usedSlotsByDeptLevelOnDate.get(longDeptLvlDateKey)!.add(freeSlot);
+
+          // 5c) If newCount == 2, force-break next date
+          if (newCount === 2) {
+            const idx = sortedDateKeys.indexOf(dateKey);
+            if (idx >= 0 && idx + 1 < sortedDateKeys.length) {
+              const nextDateKey = sortedDateKeys[idx + 1];
+              skipSet.add(`${shortDeptLvl}:${nextDateKey}`);
             }
           }
-        })
-      )
-    );
 
-    Logger.info(`Successfully scheduled ${createdExamSlots.length} exams`);
-    res.status(200).json({
-      message: `Successfully scheduled ${createdExamSlots.length} exams`,
-      examSlots: createdExamSlots
-    });
+          // 5d) Schedule the exam
+          scheduledExams.push({
+            date: new Date(dateKey),
+            timeSlot: freeSlot,
+            courseId: course.id,
+            timetableId: id
+          });
+
+          placed = true;
+          break;
+        }
+
+        if (!placed) {
+          Logger.warn(`Could not schedule (even as 3rd exam) course ${course.id} (${course.code})`);
+          unscheduled.push(course);
+        }
+      }
+
+      // End of this dept-level's two passes
+    }
+
+    // ─── 9) Persist All Scheduled Exams in a Single Transaction ─────────────
+    if (scheduledExams.length > 0) {
+      Logger.info(`Attempting to create ${scheduledExams.length} new exam slots`);
+      const createdExamSlots = await prisma.$transaction(
+        scheduledExams.map((exam) =>
+          prisma.examSlot.create({
+            data: {
+              timetableId: exam.timetableId,
+              courseId: exam.courseId,
+              date: exam.date,
+              timeSlot: exam.timeSlot
+            },
+            include: {
+              course: {
+                include: {
+                  department: true
+                }
+              }
+            }
+          })
+        )
+      );
+
+      Logger.info(`Successfully scheduled ${createdExamSlots.length} exams`);
+      res.status(200).json({
+        message: `Successfully scheduled ${createdExamSlots.length} exams.`,
+        examSlots: createdExamSlots,
+        unscheduled: unscheduled.map((c) => ({
+          id: c.id,
+          code: c.code,
+          title: c.title, // Changed from name to title to match actual course structure
+          departmentId: c.departmentId,
+          level: c.level
+        }))
+      });
+    } else {
+      res.status(200).json({
+        message: `No exams could be scheduled (all date/timeSlot combinations are full).`,
+        examSlots: [],
+        unscheduled: courses.map((c) => ({
+          id: c.id,
+          code: c.code,
+          title: c.title, // Changed from name to title to match actual course structure
+          departmentId: c.departmentId,
+          level: c.level
+        }))
+      });
+    }
   } catch (error) {
     Logger.error('Auto-schedule exams error:', error);
     res.status(500).json({ message: 'Server error' });

@@ -49,10 +49,13 @@ export const DroppableTimeSlot: React.FC<DroppableTimeSlotProps> = (props) => {
       const slotDay = day instanceof Date ? day : new Date(day);
       
       // Compare dates by checking year, month, and day
-      const sameDay = 
-        scDay.getFullYear() === slotDay.getFullYear() &&
-        scDay.getMonth() === slotDay.getMonth() &&
-        scDay.getDate() === slotDay.getDate();
+      // Use date strings for comparison to avoid time zone issues
+      const scDayString = scDay.toISOString().split('T')[0];
+      const slotDayString = slotDay.toISOString().split('T')[0];
+      const sameDay = scDayString === slotDayString;
+      
+      // Debug logging to help identify date comparison issues
+      console.log(`Comparing: SC day=${scDayString}, Slot day=${slotDayString}, Same day=${sameDay}, Time slots: ${sc.timeSlot} vs ${timeSlot}`);
       
       // Return true if both date and time slot match
       return sameDay && sc.timeSlot === timeSlot;
@@ -96,7 +99,7 @@ export const DroppableTimeSlot: React.FC<DroppableTimeSlotProps> = (props) => {
   }, [day, scheduledCourses, scheduledCoursesForSlot]);
 
   // Set up drop target
-  const [{ isOver, canDrop }, dropRef] = useDrop({
+  const [{ isOver, canDrop }, dropRef] = useDrop<{ id: string }, void, { isOver: boolean; canDrop: boolean }>({
     accept: ItemTypes.COURSE,
     drop: (item: { id: string }) => onDrop(item.id),
     canDrop: () => scheduledCoursesForSlot.length < 3, // Limit to 3 exams per slot
@@ -113,11 +116,29 @@ export const DroppableTimeSlot: React.FC<DroppableTimeSlotProps> = (props) => {
       `${scheduledCoursesForSlot.length} courses, ` +
       `conflict: ${hasConflict}, examCount: ${examCount}`
     );
-  }, [day, timeSlot, scheduledCoursesForSlot, hasConflict, examCount]);
+    
+    // Log all scheduled courses for debugging
+    console.log('All scheduled courses:', scheduledCourses.map(sc => ({
+      id: sc.id,
+      course: sc.course.code,
+      day: sc.day instanceof Date ? sc.day.toISOString() : new Date(sc.day).toISOString(),
+      timeSlot: sc.timeSlot
+    })));
+  }, [day, timeSlot, scheduledCoursesForSlot, hasConflict, examCount, scheduledCourses]);
 
+  // Create a div element ref
+  const boxRef = React.useRef<HTMLDivElement>(null);
+  
+  // Connect the drop ref to the box ref
+  React.useEffect(() => {
+    if (boxRef.current) {
+      dropRef(boxRef.current);
+    }
+  }, [dropRef]);
+  
   return (
     <Box
-      ref={dropRef}
+      ref={boxRef}
       sx={{
         height: '100px',
         border: '1px solid #e0e0e0',
