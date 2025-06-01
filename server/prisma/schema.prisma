@@ -1,0 +1,128 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Admin user model
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(ADMIN)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+// Faculty model
+model Faculty {
+  id           String       @id @default(uuid())
+  name         String       @unique
+  duration     Int          // Number of years (3 or 4)
+  departments  Department[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+// Department model
+model Department {
+  id           String     @id @default(uuid())
+  name         String
+  faculty      Faculty    @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  facultyId    String
+  courses      Course[]
+  students     Student[]
+  registrationCode String  @unique @default(uuid()) // For QR code generation
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([name, facultyId])
+}
+
+// Course model
+model Course {
+  id           String     @id @default(uuid())
+  code         String     // e.g., CS101
+  title        String
+  level        Int        // 100, 200, 300, 400
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  departmentId String
+  examSlots    ExamSlot[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([code, departmentId])
+}
+
+// Student model
+model Student {
+  id           String     @id @default(uuid())
+  name         String
+  email        String     @unique
+  password     String
+  level        Int        // 100, 200, 300, 400
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  departmentId String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+// Timetable model
+model Timetable {
+  id           String     @id @default(uuid())
+  title        String
+  startDate    DateTime
+  endDate      DateTime
+  isPublished  Boolean    @default(false)
+  examSlots    ExamSlot[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+// ExamSlot model
+model ExamSlot {
+  id           String     @id @default(uuid())
+  date         DateTime
+  timeSlot     TimeSlot
+  course       Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId     String
+  timetable    Timetable  @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  timetableId  String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([date, timeSlot, timetableId])
+}
+
+// TimeSlot enum for the 4 fixed exam periods
+enum TimeSlot {
+  SLOT_8_10   // 8:00 AM - 10:00 AM
+  SLOT_10_12  // 10:00 AM - 12:00 PM
+  SLOT_1_3    // 1:00 PM - 3:00 PM
+  SLOT_3_5    // 3:00 PM - 5:00 PM
+}
+
+// Notification model
+model Notification {
+  id           String     @id @default(uuid())
+  message      String
+  createdAt    DateTime   @default(now())
+  isRead       Boolean    @default(false)
+  studentId    String?    // If null, it's a global notification
+}

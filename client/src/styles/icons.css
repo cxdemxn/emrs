@@ -1,0 +1,184 @@
+@import './variables.css';
+
+/* Icon Styles */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Icon Sizes */
+.icon-xs {
+  font-size: var(--font-size-small);
+}
+
+.icon-sm {
+  font-size: var(--font-size-normal);
+}
+
+.icon-md {
+  font-size: var(--font-size-medium);
+}
+
+.icon-lg {
+  font-size: var(--font-size-large);
+}
+
+.icon-xl {
+  font-size: var(--font-size-xlarge);
+}
+
+/* Icon Colors */
+.icon-primary {
+  color: var(--primary-color);
+}
+
+.icon-secondary {
+  color: var(--secondary-color);
+}
+
+.icon-success {
+  color: var(--success);
+}
+
+.icon-warning {
+  color: var(--warning);
+}
+
+.icon-danger {
+  color: var(--error);
+}
+
+.icon-light {
+  color: var(--white);
+}
+
+.icon-dark {
+  color: var(--black);
+}
+
+/* Icon with Background */
+.icon-bg {
+  width: 2em;
+  height: 2em;
+  border-radius: 50%;
+  background-color: var(--light-gray);
+}
+
+.icon-bg-primary {
+  background-color: var(--primary-color);
+  color: var(--white);
+}
+
+.icon-bg-secondary {
+  background-color: var(--secondary-color);
+  color: var(--white);
+}
+
+.icon-bg-success {
+  background-color: var(--success);
+  color: var(--white);
+}
+
+.icon-bg-warning {
+  background-color: var(--warning);
+  color: var(--white);
+}
+
+.icon-bg-danger {
+  background-color: var(--error);
+  color: var(--white);
+}
+
+/* Icon with Border */
+.icon-border {
+  border: 1px solid var(--border-color);
+  padding: 0.5em;
+  border-radius: 50%;
+}
+
+/* Icon Animations */
+.icon-spin {
+  animation: icon-spin 2s infinite linear;
+}
+
+@keyframes icon-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(359deg);
+  }
+}
+
+.icon-pulse {
+  animation: icon-pulse 1s infinite ease-in-out;
+}
+
+@keyframes icon-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Icon in Form Controls */
+.form-control-icon {
+  position: relative;
+}
+
+.form-control-icon .form-control {
+  padding-left: 2.5rem;
+}
+
+.form-control-icon .icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--dark-gray);
+  pointer-events: none;
+}
+
+.form-control-icon-right .form-control {
+  padding-right: 2.5rem;
+  padding-left: var(--spacing-md);
+}
+
+.form-control-icon-right .icon {
+  left: auto;
+  right: 0.75rem;
+}
+
+/* Button with Icon */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-icon-only {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon-only.btn-sm {
+  width: 2rem;
+  height: 2rem;
+}
+
+.btn-icon-only.btn-lg {
+  width: 3rem;
+  height: 3rem;
+}

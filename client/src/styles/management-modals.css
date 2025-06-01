@@ -1,0 +1,154 @@
+/* Modal Styling */
+:root {
+  --modal-bg: #ffffff;
+  --modal-overlay: rgba(0, 0, 0, 0.5);
+  --modal-border: #e0e0e0;
+  --modal-shadow: rgba(0, 0, 0, 0.2);
+  --modal-radius: 8px;
+  --modal-padding: 24px;
+  --modal-transition: all 0.3s ease;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--modal-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+/* Modal Container */
+.modal-container {
+  background-color: var(--modal-bg);
+  border-radius: var(--modal-radius);
+  box-shadow: 0 5px 20px var(--modal-shadow);
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Modal Header */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--modal-border);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--primary-color);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--dark-gray);
+  transition: var(--modal-transition);
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.modal-close:hover {
+  background-color: var(--light-gray);
+  color: var(--primary-color);
+}
+
+/* Modal Body */
+.modal-body {
+  padding: var(--modal-padding);
+}
+
+/* QR Code Container */
+.qr-code-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.qr-code-container img {
+  border: 1px solid var(--modal-border);
+  padding: 10px;
+  background-color: white;
+}
+
+/* Registration Link */
+.registration-link p {
+  margin-bottom: 10px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.registration-link p i {
+  color: var(--primary-color);
+}
+
+.link-container {
+  display: flex;
+  gap: 10px;
+}
+
+.link-container input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--form-border);
+  border-radius: 4px;
+  background-color: var(--light-gray);
+  color: var(--dark-gray);
+  font-size: 14px;
+}
+
+.link-container button {
+  white-space: nowrap;
+}
+
+/* Modal Footer */
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--modal-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+  .modal-container {
+    max-width: 100%;
+    margin: 10px;
+  }
+  
+  .link-container {
+    flex-direction: column;
+  }
+}

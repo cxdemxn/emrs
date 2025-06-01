@@ -1,0 +1,546 @@
+@import './variables.css';
+
+/* Timetable Container */
+.timetable-container {
+  background-color: var(--white);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+/* Timetable Header */
+.timetable-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background-color: var(--primary-color);
+  color: var(--white);
+  border-top-left-radius: var(--border-radius-md);
+  border-top-right-radius: var(--border-radius-md);
+}
+
+.timetable-title {
+  font-size: var(--font-size-large);
+  font-weight: 600;
+  margin: 0;
+}
+
+.timetable-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* Timetable Navigation */
+.timetable-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background-color: var(--light-gray);
+  border-bottom: var(--border-width) solid var(--border-color);
+}
+
+.timetable-date-range {
+  font-size: var(--font-size-medium);
+  font-weight: 500;
+}
+
+.timetable-nav-buttons {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.timetable-nav-btn {
+  background-color: var(--white);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timetable-nav-btn:hover {
+  background-color: var(--medium-gray);
+}
+
+/* Timetable Grid */
+.timetable-grid {
+  display: grid;
+  grid-template-columns: 120px repeat(auto-fill, 1fr);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  overflow-x: auto;
+}
+
+/* Calendar View */
+.calendar-view {
+  display: flex;
+  height: calc(100vh - 200px);
+  overflow: hidden;
+}
+
+.calendar-sidebar {
+  width: 300px;
+  background-color: var(--light-gray);
+  border-right: 1px solid var(--border-color);
+  overflow-y: auto;
+  padding: var(--spacing-md);
+}
+
+.calendar-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md);
+  background-color: var(--primary-color);
+  color: var(--white);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+}
+
+.calendar-day {
+  background-color: var(--white);
+  border-radius: var(--border-radius-sm);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-sm);
+}
+
+.day-header {
+  background-color: var(--primary-light);
+  color: var(--primary-dark);
+  padding: var(--spacing-sm);
+  text-align: center;
+  font-weight: 600;
+  border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+}
+
+.weekend .day-header {
+  background-color: var(--gray);
+  color: var(--dark-gray);
+}
+
+.timetable-grid-header {
+  background-color: var(--light-gray);
+  font-weight: 600;
+  text-align: center;
+  padding: var(--spacing-md);
+  border: var(--border-width) solid var(--border-color);
+}
+
+.timetable-time-column {
+  background-color: var(--light-gray);
+  font-weight: 500;
+  padding: var(--spacing-md);
+  border: var(--border-width) solid var(--border-color);
+  text-align: center;
+}
+
+.timetable-cell {
+  min-height: 100px;
+  border: var(--border-width) solid var(--border-color);
+  padding: var(--spacing-sm);
+  position: relative;
+}
+
+.timetable-cell.droppable {
+  background-color: rgba(0, 153, 204, 0.1);
+}
+
+.timetable-cell.droppable.active {
+  background-color: rgba(0, 153, 204, 0.2);
+  border: 1px dashed var(--secondary-color);
+}
+
+/* Exam Items */
+.exam-item {
+  background-color: var(--light-gray);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  cursor: move;
+  border-left: 3px solid var(--primary-color);
+}
+
+.exam-item.original {
+  background-color: rgba(76, 175, 80, 0.1);
+  border-left: 3px solid var(--success);
+}
+
+.exam-item.deferred {
+  background-color: rgba(255, 152, 0, 0.1);
+  border-left: 3px solid var(--warning);
+}
+
+.exam-item.accommodated {
+  background-color: rgba(33, 150, 243, 0.1);
+  border-left: 3px solid var(--info);
+}
+
+.exam-item.rescheduled {
+  background-color: rgba(156, 39, 176, 0.1);
+  border-left: 3px solid #9c27b0;
+}
+
+.exam-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-xs);
+}
+
+.exam-item-code {
+  font-weight: 600;
+  font-size: var(--font-size-small);
+}
+
+.exam-item-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.exam-item-action {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  color: var(--dark-gray);
+}
+
+.exam-item-title {
+  font-size: var(--font-size-small);
+  margin-bottom: var(--spacing-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exam-item-details {
+  font-size: var(--font-size-small);
+  color: var(--dark-gray);
+}
+
+/* Timetable Legend */
+.timetable-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background-color: var(--light-gray);
+  border-bottom-left-radius: var(--border-radius-md);
+  border-bottom-right-radius: var(--border-radius-md);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-small);
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+/* Timetable Controls */
+.timetable-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background-color: var(--white);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.timetable-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.timetable-control-label {
+  font-size: var(--font-size-small);
+  font-weight: 500;
+}
+
+/* Timetable Filters */
+.timetable-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background-color: var(--white);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.filter-label {
+  font-size: var(--font-size-small);
+  font-weight: 500;
+}
+
+/* Draggable Courses */
+.draggable-course {
+  background-color: var(--white);
+  border: 2px solid var(--primary-color);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  cursor: grab;
+  transition: all 0.2s ease;
+}
+
+.draggable-course:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.draggable-course.is-dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.course-code {
+  font-weight: 600;
+  color: var(--primary-color);
+  display: block;
+}
+
+.course-title {
+  font-size: var(--font-size-small);
+  display: block;
+  margin: var(--spacing-xs) 0;
+}
+
+.course-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-xs);
+  color: var(--dark-gray);
+  margin-top: var(--spacing-xs);
+}
+
+/* Droppable Time Slots */
+.droppable-slot {
+  background-color: var(--light-gray);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-sm);
+  min-height: 80px;
+  transition: all 0.2s ease;
+}
+
+.droppable-slot.can-drop {
+  background-color: var(--success-light);
+  border-color: var(--success-color);
+}
+
+.droppable-slot.has-exam {
+  background-color: var(--primary-light);
+  border: 1px solid var(--primary-color);
+}
+
+.droppable-slot.has-conflict {
+  background-color: var(--warning-light);
+  border-color: var(--warning-color);
+}
+
+.droppable-slot.weekend {
+  background-color: var(--gray);
+  border-color: var(--dark-gray);
+  color: var(--dark-gray);
+}
+
+.slot-placeholder {
+  color: var(--gray);
+  text-align: center;
+  font-size: var(--font-size-small);
+  padding: var(--spacing-md) 0;
+}
+
+.exam-item {
+  position: relative;
+  padding: var(--spacing-sm);
+}
+
+.exam-item.conflict {
+  background-color: var(--warning-light);
+  border-radius: var(--border-radius-sm);
+}
+
+.exam-course-code {
+  font-weight: 600;
+  color: var(--primary-dark);
+}
+
+.exam-course-title {
+  font-size: var(--font-size-small);
+  margin-bottom: var(--spacing-xs);
+}
+
+.exam-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-xs);
+  color: var(--dark-gray);
+}
+
+.remove-exam {
+  position: absolute;
+  top: var(--spacing-xs);
+  right: var(--spacing-xs);
+  background: none;
+  border: none;
+  color: var(--danger-color);
+  cursor: pointer;
+  font-size: var(--font-size-small);
+  padding: 2px 5px;
+  border-radius: 50%;
+}
+
+.remove-exam:hover {
+  background-color: var(--danger-light);
+}
+
+/* Auto-schedule Panel */
+.auto-schedule-panel {
+  background-color: var(--white);
+  border-radius: var(--border-radius-sm);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.auto-schedule-title {
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+  color: var(--primary-dark);
+}
+
+.auto-schedule-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.auto-schedule-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+}
+
+/* Loading styles removed */
+
+/* Print View */
+.print-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.95);
+  z-index: 1000;
+  overflow: auto;
+  padding: var(--spacing-lg);
+}
+
+.print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.print-title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--primary-dark);
+}
+
+.print-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .calendar-view {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .calendar-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    max-height: 300px;
+  }
+  
+  .calendar-days {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .timetable-grid {
+    grid-template-columns: 80px repeat(auto-fill, 1fr);
+    font-size: var(--font-size-small);
+  }
+  
+  .timetable-day-header,
+  .timetable-time-header {
+    padding: var(--spacing-xs);
+  }
+  
+  .exam-item {
+    padding: var(--spacing-xs);
+  }
+}
+
+@media (max-width: 768px) {
+  .timetable-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  
+  .timetable-header, .timetable-nav {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+}
+
+@media (max-width: 768px) {
+  .timetable-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .timetable-controls, .timetable-filters {
+    flex-direction: column;
+  }
+}

@@ -1,0 +1,130 @@
+@import './variables.css';
+
+/* Table Action Buttons */
+.table-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.action-btn-view {
+  background-color: var(--primary-color);
+  color: var(--white);
+}
+
+.action-btn-view:hover {
+  background-color: var(--primary-light);
+}
+
+.action-btn-edit {
+  background-color: var(--secondary-color);
+  color: var(--white);
+}
+
+.action-btn-edit:hover {
+  background-color: var(--secondary-light);
+}
+
+.action-btn-publish {
+  background-color: var(--success);
+  color: var(--white);
+}
+
+.action-btn-publish:hover {
+  background-color: #3d8b40;
+}
+
+.action-btn-delete {
+  background-color: var(--error);
+  color: var(--white);
+}
+
+.action-btn-delete:hover {
+  background-color: #d32f2f;
+}
+
+/* Action Button Icons */
+.action-btn i {
+  font-size: 14px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .table-actions {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+  
+  .action-btn {
+    width: 100%;
+  }
+}
+
+/* Action Button Tooltip */
+.action-btn-tooltip {
+  position: relative;
+}
+
+.action-btn-tooltip:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 100;
+  margin-bottom: 5px;
+}
+
+/* Icon-only action buttons for compact views */
+.action-btn-icon-only {
+  width: 32px;
+  height: 32px;
+  min-width: unset;
+  padding: 0;
+  border-radius: 50%;
+}
+
+/* Action button group for related actions */
+.action-btn-group {
+  display: inline-flex;
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+.action-btn-group .action-btn {
+  border-radius: 0;
+  margin: 0;
+}
+
+.action-btn-group .action-btn:first-child {
+  border-top-left-radius: var(--border-radius-sm);
+  border-bottom-left-radius: var(--border-radius-sm);
+}
+
+.action-btn-group .action-btn:last-child {
+  border-top-right-radius: var(--border-radius-sm);
+  border-bottom-right-radius: var(--border-radius-sm);
+}

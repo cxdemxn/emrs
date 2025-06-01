@@ -1,0 +1,200 @@
+@import './variables.css';
+
+/* Common Layout Styles */
+html, body {
+  font-family: var(--font-family);
+  margin: 0;
+  padding: 0;
+  color: var(--black);
+  background-color: var(--light-gray);
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Admin Layout */
+.admin-layout, .student-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  flex: 1;
+}
+
+.admin-header, .student-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-height);
+  padding: 0 var(--spacing-xl);
+  background-color: var(--primary-color);
+  color: var(--white);
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+  width: 100%;
+}
+
+.logo {
+  font-size: var(--font-size-large);
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+}
+
+.logo-icon {
+  margin-right: var(--spacing-sm);
+  font-size: 1.5em;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.user-info span {
+  margin-right: var(--spacing-md);
+}
+
+.logout-btn {
+  background-color: transparent;
+  border: 1px solid var(--white);
+  color: var(--white);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.logout-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.admin-container, .student-container {
+  display: flex;
+  flex: 1;
+  width: 100%;
+}
+
+.admin-sidebar, .student-sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background-color: var(--white);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-md) 0;
+  height: calc(100vh - var(--header-height));
+  overflow-y: auto;
+}
+
+.admin-sidebar nav ul, .student-sidebar nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.admin-sidebar nav ul li, .student-sidebar nav ul li {
+  margin-bottom: var(--spacing-xs);
+}
+
+.admin-sidebar nav ul li button, .student-sidebar nav ul li button {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-xl);
+  text-align: left;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-normal);
+  color: var(--black);
+  transition: background-color 0.3s, color 0.3s;
+  border-left: 3px solid transparent;
+}
+
+.admin-sidebar nav ul li button:hover, .student-sidebar nav ul li button:hover {
+  background-color: var(--light-gray);
+  color: var(--primary-color);
+  border-left: 3px solid var(--primary-color);
+}
+
+.admin-content, .student-content {
+  flex: 1;
+  padding: var(--spacing-xl);
+  overflow-y: auto;
+  width: calc(100% - var(--sidebar-width));
+  max-width: 100%;
+  height: calc(100vh - var(--header-height));
+}
+
+/* Auth Layout */
+.auth-layout {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--light-gray);
+  background-image: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+}
+
+.auth-container {
+  width: 100%;
+  max-width: 450px;
+  background-color: var(--white);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  margin: var(--spacing-xl);
+}
+
+.auth-logo {
+  background-color: var(--primary-color);
+  color: var(--white);
+  padding: var(--spacing-xl);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-logo::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+  pointer-events: none;
+}
+
+.auth-logo h1 {
+  margin: 0;
+  font-size: var(--font-size-xxlarge);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-logo-icon {
+  margin-right: var(--spacing-sm);
+  font-size: 1.2em;
+}
+
+.auth-logo p {
+  margin: var(--spacing-sm) 0 0;
+  font-size: var(--font-size-small);
+  opacity: 0.8;
+}
+
+.auth-content {
+  padding: var(--spacing-xl);
+}
