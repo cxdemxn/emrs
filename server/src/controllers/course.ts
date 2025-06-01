@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../utils/prisma';
 import Logger from '../utils/logger';
+// import { Prisma } from '@prisma/client';
 
 // Create a new course
 export const createCourse = async (req: Request, res: Response) => {
@@ -306,6 +307,158 @@ export const deleteCourse = async (req: Request, res: Response) => {
     res.status(200).json({ message: 'Course deleted successfully' });
   } catch (error) {
     Logger.error('Delete course error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Batch create courses
+export const batchCreateCourses = async (req: Request, res: Response) => {
+  Logger.info('Batch creating courses');
+  try {
+    const { courses } = req.body;
+
+    // Validate input
+    if (!Array.isArray(courses) || courses.length === 0) {
+      return res.status(400).json({ message: 'Courses array is required and must not be empty' });
+    }
+
+    // Validate each course
+    for (const course of courses) {
+      const { code, title, level, departmentId } = course;
+      
+      // Basic validation
+      if (!code || !title || !level || !departmentId) {
+        return res.status(400).json({ 
+          message: 'Each course must have code, title, level, and departmentId',
+          invalidCourse: course 
+        });
+      }
+
+      // Validate level
+      if (![100, 200, 300, 400].includes(level)) {
+        return res.status(400).json({ 
+          message: 'Level must be 100, 200, 300, or 400',
+          invalidCourse: course 
+        });
+      }
+    }
+
+    // Get all unique department IDs from the courses
+    const departmentIds = [...new Set(courses.map(course => course.departmentId))];
+    
+    // Check if all departments exist and get their faculty information
+    const departments = await prisma.department.findMany({
+      where: {
+        id: { in: departmentIds }
+      },
+      include: {
+        faculty: true
+      }
+    });
+
+    // Check if all departments were found
+    if (departments.length !== departmentIds.length) {
+      const foundIds = departments.map(dept => dept.id);
+      const missingIds = departmentIds.filter(id => !foundIds.includes(id));
+      
+      return res.status(404).json({ 
+        message: 'Some departments were not found',
+        missingDepartmentIds: missingIds
+      });
+    }
+
+    // Create a map for quick department lookup
+    const departmentMap = new Map(departments.map(dept => [dept.id, dept]));
+
+    // Validate level against faculty duration for each course
+    for (const course of courses) {
+      const department = departmentMap.get(course.departmentId);
+      if (department && course.level > department.faculty.duration * 100) {
+        return res.status(400).json({ 
+          message: `Level cannot exceed ${department.faculty.duration * 100} for faculty ${department.faculty.name}`,
+          invalidCourse: course
+        });
+      }
+    }
+
+    // Check for duplicate course codes within the same department
+    const existingCourses = await prisma.course.findMany({
+      where: {
+        OR: courses.map(course => ({
+          AND: [
+            { code: course.code },
+            { departmentId: course.departmentId }
+          ]
+        }))
+      }
+    });
+
+    if (existingCourses.length > 0) {
+      const duplicates = existingCourses.map(existing => ({
+        code: existing.code,
+        departmentId: existing.departmentId
+      }));
+      
+      return res.status(400).json({ 
+        message: 'Some courses already exist in the specified departments',
+        duplicateCourses: duplicates
+      });
+    }
+
+    // Check for duplicates within the batch itself
+    const codeDepPairs = new Set();
+    for (const course of courses) {
+      const pair = `${course.code}-${course.departmentId}`;
+      if (codeDepPairs.has(pair)) {
+        return res.status(400).json({ 
+          message: 'Duplicate course codes within the same department in the batch',
+          duplicatePair: { code: course.code, departmentId: course.departmentId }
+        });
+      }
+      codeDepPairs.add(pair);
+    }
+
+    // All validations passed, create courses in a transaction
+    const createdCourses = await prisma.$transaction(async (prisma) => {
+      const results = [];
+      
+      for (const course of courses) {
+        const { code, title, level, departmentId, creditHours = 3 } = course;
+        
+        const created = await prisma.course.create({
+          data: {
+            code,
+            title,
+            level,
+            departmentId,
+          }
+        });
+        
+        results.push(created);
+      }
+      
+      return results;
+    });
+
+    Logger.info(`Successfully created ${createdCourses.length} courses in batch`);
+    res.status(201).json({
+      message: 'Courses created successfully',
+      createdCount: createdCourses.length,
+      courses: createdCourses
+    });
+  } catch (error) {
+    Logger.error('Batch create courses error:', error);
+    
+    // Handle specific Prisma errors
+    // if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    //   if (error.code === 'P2002') {
+    //     return res.status(400).json({ 
+    //       message: 'Unique constraint violation. Some courses may already exist.',
+    //       error: error.message
+    //     });
+    //   }
+    // }
+    
     res.status(500).json({ message: 'Server error' });
   }
 };

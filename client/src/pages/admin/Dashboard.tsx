@@ -14,6 +14,14 @@ interface Department {
   name: string;
 }
 
+interface Course {
+  id: string;
+  code: string;
+  title: string;
+  level: number;
+  department: Department;
+}
+
 interface Timetable {
   id: string;
   title: string;
@@ -25,6 +33,7 @@ interface Timetable {
 const Dashboard: React.FC = () => {
   const [faculties, setFaculties] = useState<Faculty[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [timetables, setTimetables] = useState<Timetable[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
@@ -44,6 +53,11 @@ const Dashboard: React.FC = () => {
     departments: Department[];
     message: string;
   }
+  
+  interface CoursesResponse {
+    courses: Course[];
+    message: string;
+  }
 
   interface TimetablesResponse {
     timetables: Timetable[];
@@ -55,16 +69,17 @@ const Dashboard: React.FC = () => {
       try {
         setLoading(true);
         
-        // Fetch faculties with proper type annotation
-        const facultiesResponse = await axios.get<FacultiesResponse>(`${API_URL}/faculties`);
+        // Fetch all data in parallel for better performance
+        const [facultiesResponse, departmentsResponse, coursesResponse, timetablesResponse] = await Promise.all([
+          axios.get<FacultiesResponse>(`${API_URL}/faculties`),
+          axios.get<DepartmentsResponse>(`${API_URL}/departments`),
+          axios.get<CoursesResponse>(`${API_URL}/courses`),
+          axios.get<TimetablesResponse>(`${API_URL}/timetables`)
+        ]);
+        
         setFaculties(facultiesResponse.data.faculties);
-        
-        // Fetch departments with proper type annotation
-        const departmentsResponse = await axios.get<DepartmentsResponse>(`${API_URL}/departments`);
         setDepartments(departmentsResponse.data.departments);
-        
-        // Fetch timetables with proper type annotation
-        const timetablesResponse = await axios.get<TimetablesResponse>(`${API_URL}/timetables`);
+        setCourses(coursesResponse.data.courses);
         setTimetables(timetablesResponse.data.timetables);
         
         setLoading(false);
@@ -125,6 +140,23 @@ const Dashboard: React.FC = () => {
               className="btn btn-outline"
             >
               Manage Departments
+            </button>
+          </div>
+        </div>
+        
+        <div className="stat-card">
+          <div className="stat-card-header">
+            <div className="stat-card-icon">C</div>
+            <h3 className="stat-card-title">Courses</h3>
+          </div>
+          <div className="stat-value">{courses.length}</div>
+          <p>Total courses across all departments</p>
+          <div className="stat-card-footer">
+            <button 
+              onClick={() => handleNavigate('/admin/courses')}
+              className="btn btn-outline"
+            >
+              Manage Courses
             </button>
           </div>
         </div>

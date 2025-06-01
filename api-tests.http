@@ -1,0 +1,163 @@
+### Variables
+@baseUrl = http://localhost:5000/api
+
+### Login as Admin
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "passworD123"
+}
+
+### Extract token from login response
+@token = {{login.response.body.token}}
+
+### Create a Faculty
+# @name createFaculty
+POST {{baseUrl}}/faculties
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Faculty of Engineering",
+  "duration": 4
+}
+
+### Extract faculty ID from response
+@facultyId = {{createFaculty.response.body.faculty.id}}
+
+### Get All Faculties
+GET {{baseUrl}}/faculties
+Authorization: Bearer {{token}}
+
+### Create a Department
+# @name createDepartment
+POST {{baseUrl}}/departments
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Electrical Engineering",
+  "facultyId": "{{facultyId}}"
+}
+
+### Extract department ID from response
+@departmentId = {{createDepartment.response.body.department.id}}
+
+### Get All Departments
+GET {{baseUrl}}/departments
+Authorization: Bearer {{token}}
+
+### Create a Single Course
+# @name createCourse
+POST {{baseUrl}}/courses
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "code": "CSC101",
+  "title": "Introduction to Computer Science",
+  "departmentId": "{{departmentId}}",
+  "level": 100
+}
+
+### Extract course ID from response
+@courseId = {{createCourse.response.body.course.id}}
+
+### Get All Courses
+GET {{baseUrl}}/courses
+Authorization: Bearer {{token}}
+
+### Batch Create Courses
+POST {{baseUrl}}/courses/batch
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "courses": [
+    { "code": "ELEC101", "title": "Circuit Theory", "level": 100, "departmentId": "{{departmentId}}" },
+  { "code": "ELEC102", "title": "Electronics I", "level": 100, "departmentId": "{{departmentId}}" },
+  { "code": "ELEC201", "title": "Electromagnetics", "level": 200, "departmentId": "{{departmentId}}" },
+  { "code": "ELEC202", "title": "Digital Logic", "level": 200, "departmentId": "{{departmentId}}" },
+  { "code": "ELEC301", "title": "Microprocessors", "level": 300, "departmentId": "{{departmentId}}" },
+  { "code": "ELEC302", "title": "Control Systems", "level": 300, "departmentId": "{{departmentId}}" },
+  { "code": "ELEC401", "title": "Power Electronics", "level": 400, "departmentId": "{{departmentId}}" },
+  { "code": "ELEC402", "title": "Embedded Systems", "level": 400, "departmentId": "{{departmentId}}" },
+  { "code": "ELEC403", "title": "Advanced Signal Processing", "level": 400, "departmentId": "{{departmentId}}" }
+  ]
+}
+
+### Create a Student
+# @name createStudent
+POST {{baseUrl}}/students
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "John Doe",
+  "email": "john.doe@example.com",
+  "password": "Student123",
+  "level": 200,
+  "departmentId": "{{departmentId}}"
+}
+
+### Create a Timetable
+# @name createTimetable
+POST {{baseUrl}}/timetables
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "2023/2024 First Semester Exams",
+  "startDate": "2023-12-01T00:00:00.000Z",
+  "endDate": "2023-12-15T00:00:00.000Z",
+  "isPublished": false
+}
+
+### Extract timetable ID from response
+@timetableId = {{createTimetable.response.body.timetable.id}}
+
+### Get All Timetables
+GET {{baseUrl}}/timetables
+Authorization: Bearer {{token}}
+
+### Auto-Schedule Exams
+POST {{baseUrl}}/timetables/{{timetableId}}/auto-schedule
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "departmentIds": ["{{departmentId}}"],
+  "levels": [100, 200, 300, 400]
+}
+
+### Get Exam Slots for a Timetable
+GET {{baseUrl}}/timetables/{{timetableId}}/exam-slots
+Authorization: Bearer {{token}}
+
+### Create an Exam Slot Manually
+POST {{baseUrl}}/timetables/{{timetableId}}/exam-slots
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "courseId": "{{courseId}}",
+  "date": "2023-12-01T10:00:00.000Z",
+  "timeSlot": "SLOT_10_12"
+}
+
+### Get All Notifications
+GET {{baseUrl}}/notifications
+Authorization: Bearer {{token}}
+
+### Create a Notification
+POST {{baseUrl}}/notifications
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "message": "Exam timetable for 2023/2024 First Semester has been published",
+  "studentId": null
+}

@@ -26,13 +26,13 @@ import { format, addDays, isWeekend } from 'date-fns';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import '../../styles/scheduler.css';
-import { TreeView, TreeItem } from '@mui/lab';
+// Import SimpleTreeView from the correct package (not deprecated)
+import { SimpleTreeView, TreeItem } from '@mui/x-tree-view';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 // Import the DraggableCourse and DroppableTimeSlot components
 import { DraggableCourse, DroppableTimeSlot } from './components';
-import console from 'console';
 
 // API URL
 const API_URL = 'http://localhost:5000/api';
@@ -159,6 +159,7 @@ const TimetableScheduler: React.FC = () => {
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [hasConflicts, setHasConflicts] = useState(false);
   const [courseTree, setCourseTree] = useState<CourseTree[]>([]);
+  const [debugInfo, setDebugInfo] = useState<string>(''); // Debug state
   
   // Department level colors for visual distinction
   const DEPARTMENT_LEVEL_COLORS: Record<string, string> = {
@@ -181,22 +182,49 @@ const TimetableScheduler: React.FC = () => {
     }
   }, [timetable, navigate]);
   
+  // Only rebuild course tree when all data is loaded and something changes
+  const [dataLoaded, setDataLoaded] = useState<boolean>(false);
+  
+  useEffect(() => {
+    // Only rebuild if we have all necessary data AND data has been fully loaded
+    if (dataLoaded && courses.length > 0 && departments.length > 0 && faculties.length > 0) {
+      console.log('Rebuilding course tree with complete data');
+      const tree = buildCourseTree();
+      setCourseTree(tree);
+      console.log('Course tree updated with', tree.length, 'faculties');
+    }
+  }, [dataLoaded, courses, departments, faculties, scheduledCourses]);
+  
+  // Force re-render of the tree component when courseTree changes
+  const [treeKey, setTreeKey] = useState<number>(0);
+  useEffect(() => {
+    if (courseTree.length > 0) {
+      setTreeKey(prevKey => prevKey + 1);
+    }
+  }, [courseTree]);
+  
   // Fetch all necessary data
   const fetchData = async () => {
     try {
-      // Fetch faculties
-      const facultiesResponse = await axios.get<FacultiesResponse>(`${API_URL}/faculties`);
+      setLoading(true);
+      setDataLoaded(false); // Reset data loaded flag
+      
+      // Use Promise.all to fetch all data in parallel
+      const [facultiesResponse, departmentsResponse, coursesResponse] = await Promise.all([
+        axios.get<FacultiesResponse>(`${API_URL}/faculties`),
+        axios.get<DepartmentsResponse>(`${API_URL}/departments`),
+        axios.get<CoursesResponse>(`${API_URL}/courses`)
+      ]);
+      
       const fetchedFaculties = facultiesResponse.data.faculties;
-      setFaculties(fetchedFaculties);
-      
-      // Fetch departments
-      const departmentsResponse = await axios.get<DepartmentsResponse>(`${API_URL}/departments`);
       const fetchedDepartments = departmentsResponse.data.departments;
-      setDepartments(fetchedDepartments);
-      
-      // Fetch courses
-      const coursesResponse = await axios.get<CoursesResponse>(`${API_URL}/courses`);
       const fetchedCourses = coursesResponse.data.courses;
+      
+      console.log(`Fetched ${fetchedFaculties.length} faculties, ${fetchedDepartments.length} departments, ${fetchedCourses.length} courses`);
+      
+      // Set all data at once to prevent multiple re-renders
+      setFaculties(fetchedFaculties);
+      setDepartments(fetchedDepartments);
       setCourses(fetchedCourses);
       
       // Fetch timetable with exam slots
@@ -217,11 +245,10 @@ const TimetableScheduler: React.FC = () => {
         }
       }
       
-      // Build the course tree after all data is fetched
-      const tree = buildCourseTree();
-      setCourseTree(tree);
-      
+      // Mark data as loaded after all state updates
+      // This will trigger the useEffect to build the course tree
       setLoading(false);
+      setDataLoaded(true);
     } catch (err) {
       setError('Failed to load timetable data. Please try again.');
       setLoading(false);
@@ -249,7 +276,27 @@ const TimetableScheduler: React.FC = () => {
   
   // Build hierarchical course tree for the course selection panel
   const buildCourseTree = (): CourseTree[] => {
-    if (!courses.length || !departments.length || !faculties.length) return [];
+    // Only log when actually building a tree with data
+    if (courses.length && departments.length && faculties.length) {
+      console.log('Building course tree with:', {
+        courses: courses.length,
+        departments: departments.length,
+        faculties: faculties.length,
+        scheduledCourses: scheduledCourses.length
+      });
+    }
+    
+    if (!courses.length || !departments.length || !faculties.length) {
+      // Don't log this during initial render or when data is still loading
+      if (dataLoaded) {
+        console.log('Missing data for course tree:', {
+          courses: courses.length === 0,
+          departments: departments.length === 0,
+          faculties: faculties.length === 0
+        });
+      }
+      return [];
+    }
     
     const tree: CourseTree[] = [];
     
@@ -285,27 +332,37 @@ const TimetableScheduler: React.FC = () => {
           }
         });
         
-        tree.push(facultyNode);
+        // Only add faculty to tree if it has departments with courses
+        if (facultyNode.departments.length > 0) {
+          tree.push(facultyNode);
+        }
       }
     });
+    
+    // Log the tree for debugging
+    console.log('Course tree built with', tree.length, 'faculties');
+    if (tree.length > 0) {
+      console.log('First faculty:', tree[0].faculty, 'with', tree[0].departments.length, 'departments');
+    }
     
     return tree;
   };
   
   // Check if a course is already scheduled
   const isCourseScheduled = (courseId: string): boolean => {
-    return scheduledCourses.some(sc => sc.course.id === courseId);
+    if (!scheduledCourses || scheduledCourses.length === 0) return false;
+    return scheduledCourses.some(sc => sc && sc.course && sc.course.id === courseId);
   };
   
   // Count exams for a department-level on a specific day
   const countExamsForDepartmentLevelOnDay = (departmentId: string, level: number, day: Date): number => {
-    // Ensure we have a valid day
-    if (!day) return 0;
+    // Ensure we have a valid day and scheduled courses
+    if (!day || !Array.isArray(scheduledCourses)) return 0;
     
     // Convert the day to a string format for comparison (YYYY-MM-DD)
     const dayString = day.toISOString().split('T')[0];
     
-    return scheduledCourses.filter(sc => {
+    return scheduledCourses.filter((sc: ScheduledCourse) => {
       // Skip invalid scheduled courses
       if (!sc || !sc.course || !sc.day) return false;
       
@@ -315,7 +372,8 @@ const TimetableScheduler: React.FC = () => {
       // Convert to string format for reliable comparison
       const scDayString = scDay.toISOString().split('T')[0];
       
-      return sc.course.department.id === departmentId && 
+      return sc.course.department && 
+             sc.course.department.id === departmentId && 
              sc.course.level === level && 
              scDayString === dayString;
     }).length;
@@ -326,30 +384,45 @@ const TimetableScheduler: React.FC = () => {
     // Check if any department-level has more than 2 exams on any day
     let hasAnyConflicts = false;
     
-    weekDays.forEach(day => {
-      departments.forEach(dept => {
+    if (!Array.isArray(weekDays) || !Array.isArray(departments) || !Array.isArray(courses)) {
+      console.warn('Cannot update conflict status: missing required data');
+      return;
+    }
+    
+    weekDays.forEach((day: Date) => {
+      departments.forEach((dept: Department) => {
         // Get all levels for this department from courses
         const levels = [...new Set(courses
-          .filter(c => c.department.id === dept.id)
-          .map(c => c.level))];
+          .filter((c: Course) => c.department && c.department.id === dept.id)
+          .map((c: Course) => c.level))];
         
-        levels.forEach(level => {
-          const examCount = countExamsForDepartmentLevelOnDay(dept.id, level, day);
-          if (examCount > 2) {
-            hasAnyConflicts = true;
+        levels.forEach((level: number) => {
+          if (typeof countExamsForDepartmentLevelOnDay === 'function') {
+            const examCount = countExamsForDepartmentLevelOnDay(dept.id, level, day);
+            if (examCount > 2) {
+              hasAnyConflicts = true;
+            }
           }
         });
       });
     });
     
-    setHasConflicts(hasAnyConflicts);
+    if (typeof setHasConflicts === 'function') {
+      setHasConflicts(hasAnyConflicts);
+    }
   };
   
   // Update course tree when scheduled courses change
   useEffect(() => {
-    if (courses.length && departments.length && faculties.length) {
-      const tree = buildCourseTree();
-      setCourseTree(tree);
+    if (Array.isArray(courses) && courses.length && 
+        Array.isArray(departments) && departments.length && 
+        Array.isArray(faculties) && faculties.length) {
+      if (typeof buildCourseTree === 'function') {
+        const tree = buildCourseTree();
+        if (typeof setCourseTree === 'function') {
+          setCourseTree(tree);
+        }
+      }
     }
   }, [scheduledCourses, courses, departments, faculties]);
   
@@ -359,14 +432,29 @@ const TimetableScheduler: React.FC = () => {
       return 'error'; // Invalid input
     }
     
+    // Ensure course has department property
+    if (!course.department || !course.department.id) {
+      console.error('Course is missing department information');
+      return 'error';
+    }
+    
     // Convert the day to a string format for comparison (YYYY-MM-DD)
     const dayString = day.toISOString().split('T')[0];
     
     // Count exams for this department-level on this day
+    if (typeof countExamsForDepartmentLevelOnDay !== 'function') {
+      console.error('countExamsForDepartmentLevelOnDay function is not defined');
+      return 'error';
+    }
     const examCount = countExamsForDepartmentLevelOnDay(course.department.id, course.level, day);
     
     // Check if this department-level already has an exam in this time slot on this day
-    const timeSlotConflict = scheduledCourses.some(sc => {
+    if (!Array.isArray(scheduledCourses)) {
+      console.warn('scheduledCourses is not an array');
+      return 'error';
+    }
+    
+    const timeSlotConflict = scheduledCourses.some((sc: ScheduledCourse) => {
       if (!sc || !sc.course || !sc.day) return false;
       
       // Ensure sc.day is a Date object
@@ -375,7 +463,8 @@ const TimetableScheduler: React.FC = () => {
       // Convert to string format for reliable comparison
       const scDayString = scDay.toISOString().split('T')[0];
       
-      return scDayString === dayString && 
+      return sc.course.department && 
+             scDayString === dayString && 
              sc.timeSlot === timeSlot &&
              sc.course.department.id === course.department.id &&
              sc.course.level === course.level;
@@ -389,9 +478,14 @@ const TimetableScheduler: React.FC = () => {
     // Find the previous weekday
     let prevDay = new Date(day);
     prevDay.setDate(prevDay.getDate() - 1);
+    
     // Skip weekends when looking for previous weekday
-    while (isWeekend(prevDay)) {
-      prevDay.setDate(prevDay.getDate() - 1);
+    if (typeof isWeekend !== 'function') {
+      console.warn('isWeekend function is not defined');
+    } else {
+      while (isWeekend(prevDay)) {
+        prevDay.setDate(prevDay.getDate() - 1);
+      }
     }
   
     const prevDayExamCount = countExamsForDepartmentLevelOnDay(course.department.id, course.level, prevDay);
@@ -410,101 +504,167 @@ const TimetableScheduler: React.FC = () => {
     
     return 'none';
   };
-  
-  // Handle auto-scheduling via API
-  const handleAutoSchedule = async () => {
+
+  // All duplicate code has been removed as it was causing syntax errors
+  // The proper checkForConflicts function is defined above at line 391
+
+// Handle auto-scheduling via API
+const handleAutoSchedule = async () => {
+  if (typeof setIsAutoScheduling === 'function') {
     setIsAutoScheduling(true);
-    
-    try {
-      // Get all department IDs and levels for auto-scheduling
-      const departmentIds = departments.map(dept => dept.id);
-      
-      // Get unique levels from courses
-      const levels = [...new Set(courses.map(course => course.level))];
-      
-      // Call auto-schedule API endpoint with required data
-      const response = await axios.post<ExamSlotsResponse>(
-        `${API_URL}/timetables/${timetable.id}/auto-schedule`,
-        { departmentIds, levels }
+  }
+  console.log('Starting auto-scheduling...');
+
+  try {
+    // Get all department IDs and levels for auto-scheduling
+    const departmentIds = Array.isArray(departments) ? departments.map((dept: Department) => dept.id) : [];
+
+    // Get unique levels from courses
+    const levels = Array.isArray(courses) ? [...new Set(courses.map((course: Course) => course.level))] : [];
+
+    if (!timetable || !timetable.id) {
+      console.error('Timetable ID is undefined');
+      if (typeof setSnackbarMessage === 'function' && 
+          typeof setSnackbarSeverity === 'function' && 
+          typeof setSnackbarOpen === 'function') {
+        setSnackbarMessage('Timetable ID is undefined');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+      }
+      if (typeof setIsAutoScheduling === 'function') {
+        setIsAutoScheduling(false);
+      }
+      return;
+    }
+
+    // Call auto-schedule API endpoint with required data
+    const response = await axios.post<ExamSlotsResponse>(
+      `${API_URL}/timetables/${timetable.id}/auto-schedule`,
+      { departmentIds, levels }
+    );
+
+    console.log('Auto-schedule response:', response.data);
+
+    // Check if auto-scheduling was successful
+    if (response.data.examSlots && response.data.examSlots.length > 0) {
+      console.log(`Auto-scheduled ${response.data.examSlots.length} exams`);
+
+      // After auto-scheduling, fetch all exam slots for this timetable to get the complete picture
+      const allSlotsResponse = await axios.get<ExamSlotsResponse>(
+        `${API_URL}/timetables/${timetable.id}/exam-slots`
       );
       
-      // Check if auto-scheduling was successful
-      if (response.data.examSlots && response.data.examSlots.length > 0) {
-        // After auto-scheduling, fetch all exam slots for this timetable to get the complete picture
-        const allSlotsResponse = await axios.get<ExamSlotsResponse>(
-          `${API_URL}/timetables/${timetable.id}/exam-slots`
-        );
+      console.log('All slots response:', allSlotsResponse.data);
+      
+      if (allSlotsResponse.data.examSlots && allSlotsResponse.data.examSlots.length > 0) {
+        // Process all exam slots (both auto-scheduled and manually scheduled)
+        const allScheduledCourses = allSlotsResponse.data.examSlots.map(slot => {
+          // Create a proper date object from the server response
+          const dateObj = new Date(slot.date);
+          
+          return {
+            id: slot.id,
+            course: slot.course,
+            day: dateObj,
+            timeSlot: slot.timeSlot
+          };
+        });
         
-        if (allSlotsResponse.data.examSlots && allSlotsResponse.data.examSlots.length > 0) {
-          // Process all exam slots (both auto-scheduled and manually scheduled)
-          const allScheduledCourses = allSlotsResponse.data.examSlots.map(slot => {
-            // Create a proper date object from the server response
-            const dateObj = new Date(slot.date);
-            
-            return {
-              id: slot.id,
-              course: slot.course,
-              day: dateObj,
-              timeSlot: slot.timeSlot
-            };
-          });
-          
-          // Update the scheduled courses state with all exam slots
+        console.log('Updating scheduled courses with', allScheduledCourses.length, 'slots');
+        
+        // Update the scheduled courses state with all exam slots
+        if (typeof setScheduledCourses === 'function') {
           setScheduledCourses(allScheduledCourses);
-          
-          // Update conflict status after setting scheduled courses
-          setTimeout(() => {
+        }
+        
+        // Rebuild the course tree to reflect the new scheduling state
+        console.log('Manually rebuilding course tree after auto-scheduling');
+        const updatedTree = buildCourseTree();
+        if (typeof setCourseTree === 'function') {
+          setCourseTree(updatedTree);
+        }
+        
+        // Update conflict status after setting scheduled courses
+        setTimeout(() => {
+          if (typeof updateConflictStatus === 'function') {
             updateConflictStatus();
-          }, 0);
-          
+          }
+        }, 0);
+        
+        if (typeof setSnackbarMessage === 'function' && 
+            typeof setSnackbarSeverity === 'function' && 
+            typeof setSnackbarOpen === 'function') {
           setSnackbarMessage(`Successfully auto-scheduled ${response.data.examSlots.length} exams`);
           setSnackbarSeverity('success');
           setSnackbarOpen(true);
-        } else {
-          // This should not happen, but handle it just in case
+        }
+      } else {
+        // This should not happen, but handle it just in case
+        console.warn('Auto-scheduling completed but could not retrieve all exam slots');
+        if (typeof setSnackbarMessage === 'function' && 
+            typeof setSnackbarSeverity === 'function' && 
+            typeof setSnackbarOpen === 'function') {
           setSnackbarMessage('Auto-scheduling completed but could not retrieve all exam slots');
           setSnackbarSeverity('warning');
           setSnackbarOpen(true);
         }
-      } else {
+      }
+    } else {
+      console.warn('No courses could be auto-scheduled');
+      if (typeof setSnackbarMessage === 'function' && 
+          typeof setSnackbarSeverity === 'function' && 
+          typeof setSnackbarOpen === 'function') {
         setSnackbarMessage('No courses could be auto-scheduled');
         setSnackbarSeverity('warning');
         setSnackbarOpen(true);
       }
-    } catch (error) {
+    }
+  } catch (error) {
+    console.error('Auto-scheduling error:', error);
+    if (typeof setSnackbarMessage === 'function' && 
+        typeof setSnackbarSeverity === 'function' && 
+        typeof setSnackbarOpen === 'function') {
       setSnackbarMessage('Failed to auto-schedule exams');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
-    } finally {
+    }
+  } finally {
+    if (typeof setIsAutoScheduling === 'function') {
       setIsAutoScheduling(false);
     }
-  };
-  
-  // Update course tree when scheduled courses change
-  useEffect(() => {
-    if (courses.length && departments.length && faculties.length) {
-      const tree = buildCourseTree();
-      setCourseTree(tree);
-    }
-  }, [scheduledCourses, courses, departments, faculties]);
+  }
+};
   
   // Handle course drop (drag and drop scheduling)
   const handleCourseDrop = async (courseId: string, day: Date, timeSlot: string) => {
     // Find the course object
-    const course = courses.find(c => c.id === courseId);
+    const course = Array.isArray(courses) ? courses.find((c: Course) => c.id === courseId) : undefined;
     if (!course) return;
     
     // Check for conflicts before scheduling
+    if (typeof checkForConflicts !== 'function') {
+      console.error('checkForConflicts function is not defined');
+      return;
+    }
     const conflictStatus = checkForConflicts(course, day, timeSlot);
     
     if (conflictStatus === 'error') {
-      setSnackbarMessage('Cannot schedule: Maximum 3 exams per department-level per day reached');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
+      if (typeof setSnackbarMessage === 'function' && 
+          typeof setSnackbarSeverity === 'function' && 
+          typeof setSnackbarOpen === 'function') {
+        setSnackbarMessage('Cannot schedule: Maximum 3 exams per department-level per day reached');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+      }
       return;
     }
     
     try {
+      if (!timetable || !timetable.id) {
+        console.error('Timetable ID is undefined');
+        return;
+      }
+      
       // Call API to add exam slot
       const response = await axios.post<ExamSlotResponse>(
         `${API_URL}/timetables/${timetable.id}/exam-slots`,
@@ -524,24 +684,37 @@ const TimetableScheduler: React.FC = () => {
       };
       
       // Update scheduled courses state
-      setScheduledCourses([...scheduledCourses, newScheduledCourse]);
+      if (typeof setScheduledCourses === 'function') {
+        setScheduledCourses([...scheduledCourses, newScheduledCourse]);
+      }
       
       // Update conflict status
-      updateConflictStatus();
+      if (typeof updateConflictStatus === 'function') {
+        updateConflictStatus();
+      }
       
-      if (conflictStatus === 'warning') {
-        setSnackbarMessage('Course scheduled with warning: 3 exams on same day for this department-level');
-        setSnackbarSeverity('warning');
-        setSnackbarOpen(true);
-      } else {
-        setSnackbarMessage('Course scheduled successfully');
-        setSnackbarSeverity('success');
-        setSnackbarOpen(true);
+      if (typeof setSnackbarMessage === 'function' && 
+          typeof setSnackbarSeverity === 'function' && 
+          typeof setSnackbarOpen === 'function') {
+        if (conflictStatus === 'warning') {
+          setSnackbarMessage('Course scheduled with warning: 3 exams on same day for this department-level');
+          setSnackbarSeverity('warning');
+          setSnackbarOpen(true);
+        } else {
+          setSnackbarMessage('Course scheduled successfully');
+          setSnackbarSeverity('success');
+          setSnackbarOpen(true);
+        }
       }
     } catch (error) {
-      setSnackbarMessage('Failed to schedule course');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
+      console.error('Failed to schedule course:', error);
+      if (typeof setSnackbarMessage === 'function' && 
+          typeof setSnackbarSeverity === 'function' && 
+          typeof setSnackbarOpen === 'function') {
+        setSnackbarMessage('Failed to schedule course');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+      }
     }
 };
 
@@ -627,7 +800,7 @@ const confirmPublish = async () => {
     
     // Navigate back to timetables list after successful publish
     setTimeout(() => {
-      navigate('/admin/timetables', { replace: true });
+      navigate('/admin/timetables/view', { replace: true });
     }, 2000);
   } catch (error) {
     setSnackbarMessage('Failed to publish timetable');
@@ -740,53 +913,107 @@ if (!timetable) {
               </Typography>
               <Divider sx={{ mb: 2 }} />
               
-              <TreeView
-                defaultCollapseIcon={<ExpandMoreIcon />}
-                defaultExpandIcon={<ChevronRightIcon />}
+              {/* Add debug info to help troubleshoot */}
+              {courses.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Total courses: {courses.length}, Scheduled: {scheduledCourses.length}, 
+                    Unscheduled: {courses.length - scheduledCourses.filter(sc => sc && sc.course).length}
+                  </Typography>
+                </Box>
+              )}
+              
+              <SimpleTreeView
+                key={`course-tree-${treeKey}`}
+                aria-label="course tree"
+                defaultExpandedItems={['faculty-0']} // Auto-expand first faculty
+                sx={{ flexGrow: 1, overflowY: 'auto' }}
+                slots={{
+                  expandIcon: ChevronRightIcon,
+                  collapseIcon: ExpandMoreIcon
+                }}
               >
-                {courseTree.map((faculty: CourseTree, facultyIndex: number) => (
-                  <TreeItem 
-                    key={`faculty-${facultyIndex}`} 
-                    nodeId={`faculty-${facultyIndex}`} 
-                    label={faculty.faculty}
-                  >
-                    {faculty.departments.map((department: any, deptIndex: number) => (
+                {courseTree.length === 0 ? (
+                  <Box sx={{ p: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No unscheduled courses available or course tree is empty.
+                      {courses.length === 0 && ' No courses loaded.'}
+                    </Typography>
+                  </Box>
+                ) : (
+                  courseTree.map((faculty: CourseTree, facultyIndex: number) => {
+                    // Count unscheduled courses in this faculty
+                    let facultyUnscheduledCount = 0;
+                    faculty.departments.forEach((dept: { levels: any[] }) => {
+                      dept.levels.forEach((level: { courses: Course[] }) => {
+                        facultyUnscheduledCount += level.courses.filter((course: Course) => !isCourseScheduled(course.id)).length;
+                      });
+                    });
+                    
+                    return (
                       <TreeItem 
-                        key={`dept-${facultyIndex}-${deptIndex}`} 
-                        nodeId={`dept-${facultyIndex}-${deptIndex}`} 
-                        label={department.name}
+                        key={`faculty-${facultyIndex}`} 
+                        itemId={`faculty-${facultyIndex}`} 
+                        label={`${faculty.faculty} (${facultyUnscheduledCount})`}
                       >
-                        {department.levels.map((level: any, levelIndex: number) => (
-                          <TreeItem 
-                            key={`level-${facultyIndex}-${deptIndex}-${levelIndex}`} 
-                            nodeId={`level-${facultyIndex}-${deptIndex}-${levelIndex}`} 
-                            label={`Level ${level.level}`}
-                          >
-                            {level.courses
-                              .filter((course: Course) => !isCourseScheduled(course.id))
-                              .map((course: Course) => (
-                                <Box key={course.id} sx={{ p: 1 }}>
-                                  <DraggableCourse 
-                                    course={{
-                                      ...course,
-                                      title: course.title || course.code, // Ensure title exists
-                                      department: {
-                                        id: course.department.id,
-                                        name: course.department.name
-                                      }
-                                    }} 
-                                    departmentId={department.name}
-                                    level={level.level}
-                                  />
-                                </Box>
-                              ))}
-                          </TreeItem>
-                        ))}
+                        {faculty.departments.map((department: { name: string; levels: { level: number; courses: Course[] }[] }, deptIndex: number) => {
+                          // Count unscheduled courses in this department
+                          let deptUnscheduledCount = 0;
+                          department.levels.forEach((level: { level: number; courses: Course[] }) => {
+                            deptUnscheduledCount += level.courses.filter((course: Course) => !isCourseScheduled(course.id)).length;
+                          });
+                          
+                          return (
+                            <TreeItem 
+                              key={`dept-${facultyIndex}-${deptIndex}`} 
+                              itemId={`dept-${facultyIndex}-${deptIndex}`} 
+                              label={`${department.name} (${deptUnscheduledCount})`}
+                            >
+                              {department.levels.map((level: { level: number; courses: Course[] }, levelIndex: number) => {
+                                // Get unscheduled courses for this level
+                                const unscheduledCourses = level.courses.filter((course: Course) => !isCourseScheduled(course.id));
+                                
+                                return (
+                                  <TreeItem 
+                                    key={`level-${facultyIndex}-${deptIndex}-${levelIndex}`} 
+                                    itemId={`level-${facultyIndex}-${deptIndex}-${levelIndex}`} 
+                                    label={`Level ${level.level} (${unscheduledCourses.length})`}
+                                  >
+                                    {unscheduledCourses.length === 0 ? (
+                                      <Box sx={{ p: 1 }}>
+                                        <Typography variant="body2" color="text.secondary">
+                                          All courses scheduled
+                                        </Typography>
+                                      </Box>
+                                    ) : (
+                                      unscheduledCourses.map((course: Course) => (
+                                        <Box key={course.id} sx={{ p: 1 }}>
+                                          <DraggableCourse 
+                                            course={{
+                                              ...course,
+                                              title: course.title || course.code, // Ensure title exists
+                                              department: {
+                                                id: course.department.id,
+                                                name: course.department.name
+                                              }
+                                            }} 
+                                            departmentId={department.name}
+                                            level={level.level}
+                                          />
+                                        </Box>
+                                      ))
+                                    )}
+                                  </TreeItem>
+                                );
+                              })}
+                            </TreeItem>
+                          );
+                        })}
                       </TreeItem>
-                    ))}
-                  </TreeItem>
-                ))}
-              </TreeView>
+                    );
+                  })
+                )}
+              </SimpleTreeView>
             </Paper>
           </Grid>
           

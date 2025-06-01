@@ -5,7 +5,8 @@ import {
   getCourseById, 
   updateCourse, 
   deleteCourse,
-  getCoursesByDepartmentAndLevel
+  getCoursesByDepartmentAndLevel,
+  batchCreateCourses
 } from '../controllers/course';
 import { authenticate, isAdmin } from '../middleware/auth';
 
@@ -16,6 +17,9 @@ router.use(authenticate as RequestHandler);
 
 // Create course (admin only)
 router.post('/', isAdmin as RequestHandler, createCourse as RequestHandler);
+
+// Batch create courses (admin only)
+router.post('/batch', isAdmin as RequestHandler, batchCreateCourses as RequestHandler);
 
 // Get all courses
 router.get('/', getAllCourses as RequestHandler);
