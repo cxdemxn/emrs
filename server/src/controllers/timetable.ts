@@ -542,6 +542,50 @@ export const removeExamSlot = async (req: Request, res: Response) => {
   }
 };
 
+// Get all exam slots for a timetable
+export const getExamSlots = async (req: Request, res: Response) => {
+  Logger.info(`Getting all exam slots for timetable ID: ${req.params.id}`);
+  try {
+    const { id } = req.params;
+
+    // Check if timetable exists
+    const timetable = await prisma.timetable.findUnique({
+      where: { id }
+    });
+
+    if (!timetable) {
+      return res.status(404).json({ message: 'Timetable not found' });
+    }
+
+    // Get all exam slots for this timetable
+    const examSlots = await prisma.examSlot.findMany({
+      where: {
+        timetableId: id
+      },
+      include: {
+        course: {
+          include: {
+            department: true
+          }
+        }
+      },
+      orderBy: [
+        { date: 'asc' },
+        { timeSlot: 'asc' }
+      ]
+    });
+
+    Logger.info(`Found ${examSlots.length} exam slots for timetable ${id}`);
+    res.status(200).json({
+      message: 'Exam slots retrieved successfully',
+      examSlots
+    });
+  } catch (error) {
+    Logger.error('Get exam slots error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 /**
  * Auto-schedules exams with these rules:
  * 1) Each department-level may have up to 2 exams/day. If absolutely necessary, a third is allowed.

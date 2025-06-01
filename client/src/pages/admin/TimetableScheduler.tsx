@@ -428,36 +428,44 @@ const TimetableScheduler: React.FC = () => {
         { departmentIds, levels }
       );
       
-      // Convert returned exam slots to scheduled courses
+      // Check if auto-scheduling was successful
       if (response.data.examSlots && response.data.examSlots.length > 0) {
-        console.log('Auto-scheduled exam slots:', response.data.examSlots);
+        // After auto-scheduling, fetch all exam slots for this timetable to get the complete picture
+        const allSlotsResponse = await axios.get<ExamSlotsResponse>(
+          `${API_URL}/timetables/${timetable.id}/exam-slots`
+        );
         
-        // Process the auto-scheduled courses
-        const autoScheduledCourses = response.data.examSlots.map(slot => {
-          // Create a proper date object from the server response
-          const dateObj = new Date(slot.date);
+        if (allSlotsResponse.data.examSlots && allSlotsResponse.data.examSlots.length > 0) {
+          // Process all exam slots (both auto-scheduled and manually scheduled)
+          const allScheduledCourses = allSlotsResponse.data.examSlots.map(slot => {
+            // Create a proper date object from the server response
+            const dateObj = new Date(slot.date);
+            
+            return {
+              id: slot.id,
+              course: slot.course,
+              day: dateObj,
+              timeSlot: slot.timeSlot
+            };
+          });
           
-          return {
-            id: slot.id,
-            course: slot.course,
-            day: dateObj,
-            timeSlot: slot.timeSlot
-          };
-        });
-        
-        // Update the scheduled courses state with the new auto-scheduled courses
-        // We completely replace the scheduled courses with the new ones from the server
-        // since the server has deleted any previous exam slots for these courses
-        setScheduledCourses(autoScheduledCourses);
-        
-        // Update conflict status after setting scheduled courses
-        setTimeout(() => {
-          updateConflictStatus();
-        }, 0);
-        
-        setSnackbarMessage(`Successfully auto-scheduled ${autoScheduledCourses.length} exams`);
-        setSnackbarSeverity('success');
-        setSnackbarOpen(true);
+          // Update the scheduled courses state with all exam slots
+          setScheduledCourses(allScheduledCourses);
+          
+          // Update conflict status after setting scheduled courses
+          setTimeout(() => {
+            updateConflictStatus();
+          }, 0);
+          
+          setSnackbarMessage(`Successfully auto-scheduled ${response.data.examSlots.length} exams`);
+          setSnackbarSeverity('success');
+          setSnackbarOpen(true);
+        } else {
+          // This should not happen, but handle it just in case
+          setSnackbarMessage('Auto-scheduling completed but could not retrieve all exam slots');
+          setSnackbarSeverity('warning');
+          setSnackbarOpen(true);
+        }
       } else {
         setSnackbarMessage('No courses could be auto-scheduled');
         setSnackbarSeverity('warning');

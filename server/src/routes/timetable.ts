@@ -9,7 +9,8 @@ import {
   addExamSlot,
   removeExamSlot,
   autoScheduleExams,
-  getTimetableByDepartmentAndLevel
+  getTimetableByDepartmentAndLevel,
+  getExamSlots
 } from '../controllers/timetable';
 import { authenticate, isAdmin } from '../middleware/auth';
 
@@ -41,6 +42,9 @@ router.put('/:id/publish', isAdmin as RequestHandler, publishTimetable as Reques
 
 // Add exam slot to timetable (admin only)
 router.post('/:id/exam-slots', isAdmin as RequestHandler, addExamSlot as RequestHandler);
+
+// Get all exam slots for a timetable
+router.get('/:id/exam-slots', authenticate as RequestHandler, getExamSlots as RequestHandler);
 
 // Remove exam slot from timetable (admin only)
 router.delete('/:id/exam-slots/:slotId', isAdmin as RequestHandler, removeExamSlot as RequestHandler);
