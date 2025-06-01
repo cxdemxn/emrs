@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useReactToPrint } from 'react-to-print';
 import { Box, Tabs, Tab } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 // Import the reusable TimetableCalendarView component
 import TimetableCalendarView from '../../components/TimetableCalendarView';
 
@@ -50,6 +51,7 @@ const timeSlotMap: Record<string, string> = {
 };
 
 const TimetableView: React.FC = () => {
+  const navigate = useNavigate();
   const [timetables, setTimetables] = useState<Timetable[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -133,6 +135,12 @@ const TimetableView: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to publish timetable');
     }
+  };
+
+  // Handle timetable editing - navigate to scheduler with timetable ID
+  const handleEditTimetable = (timetableId: string) => {
+    // Navigate to the scheduler page with the timetable ID as a URL parameter
+    navigate(`/admin/timetables/scheduler?timetableId=${timetableId}`);
   };
 
   const handleDeleteTimetable = async (timetableId: string) => {
@@ -285,6 +293,17 @@ const TimetableView: React.FC = () => {
                         >
                           <i className="fas fa-check-circle"></i>
                           Publish
+                        </button>
+                      )}
+                      
+                      {!timetable.isPublished && (
+                        <button 
+                          onClick={() => handleEditTimetable(timetable.id)}
+                          className="action-button edit"
+                          title="Edit timetable"
+                        >
+                          <i className="fas fa-edit"></i>
+                          Edit
                         </button>
                       )}
                       

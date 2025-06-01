@@ -98,15 +98,15 @@ interface ScheduledCourse {
 }
 
 // Time slot mapping (matches backend enum)
-const TIME_SLOT_MAP: Record<string, string> = {
-  'SLOT_8_10': '8:00 AM - 10:00 AM',
-  'SLOT_10_12': '10:00 AM - 12:00 PM',
-  'SLOT_1_3': '1:00 PM - 3:00 PM',
-  'SLOT_3_5': '3:00 PM - 5:00 PM'
-};
+// const TIME_SLOT_MAP: Record<string, string> = {
+//   'SLOT_8_10': '8:00 AM - 10:00 AM',
+//   'SLOT_10_12': '10:00 AM - 12:00 PM',
+//   'SLOT_1_3': '1:00 PM - 3:00 PM',
+//   'SLOT_3_5': '3:00 PM - 5:00 PM'
+// };
 
 // Time slots array
-const TIME_SLOTS = Object.keys(TIME_SLOT_MAP);
+// const TIME_SLOTS = Object.keys(TIME_SLOT_MAP);
 
 // Interface for API responses
 interface ApiResponse {
@@ -141,6 +141,10 @@ interface ExamSlotsResponse extends ApiResponse {
 const TimetableScheduler: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Extract timetable ID from URL parameters if present
+  const queryParams = new URLSearchParams(location.search);
+  const timetableIdFromUrl = queryParams.get('timetableId');
   const timetable = location.state?.timetable as Timetable;
   
   // State for data
@@ -151,6 +155,16 @@ const TimetableScheduler: React.FC = () => {
   const [, setLoading] = useState<boolean>(false);
   const [, setError] = useState<string | null>(null);
   const [calendarKey, setCalendarKey] = useState<number>(0); // Add a key to force re-render
+  const [currentTimetable, setCurrentTimetable] = useState<Timetable | null>(null);
+  currentTimetable;
+
+  const [formData, setFormData] = useState({
+    title: '',
+    startDate: '',
+    endDate: ''
+  });
+formData
+
   // State for UI
   const [weekDays, setWeekDays] = useState<Date[]>([]);
   const [isAutoScheduling, setIsAutoScheduling] = useState(false);
@@ -162,49 +176,9 @@ const TimetableScheduler: React.FC = () => {
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [hasConflicts, setHasConflicts] = useState(false);
   const [courseTree, setCourseTree] = useState<CourseTree[]>([]);
-  const [debugInfo, setDebugInfo] = useState<string>(''); // Debug state
+  // State for UI feedback
   
-  // Department level colors for visual distinction
-  const DEPARTMENT_LEVEL_COLORS: Record<string, string> = {
-    'dept-1-100': '#2196f3', // CS Level 100
-    'dept-1-200': '#0288d1', // CS Level 200
-    'dept-2-100': '#4caf50', // Math Level 100
-    'dept-2-300': '#2e7d32', // Math Level 300
-    'dept-3-100': '#ff9800', // Nursing Level 100
-    'dept-4-100': '#f44336'  // English Level 100
-  };
-  
-  // Initialize weekdays from timetable date range and fetch data
-  useEffect(() => {
-    if (timetable) {
-      generateWeekDays(new Date(timetable.startDate), new Date(timetable.endDate));
-      fetchData();
-    } else {
-      // If no timetable data, redirect back to form
-      navigate('/admin/timetables/create');
-    }
-  }, [timetable, navigate]);
-  
-  // Only rebuild course tree when all data is loaded and something changes
-  const [dataLoaded, setDataLoaded] = useState<boolean>(false);
-  
-  useEffect(() => {
-    // Only rebuild if we have all necessary data AND data has been fully loaded
-    if (dataLoaded && courses.length > 0 && departments.length > 0 && faculties.length > 0) {
-      console.log('Rebuilding course tree with complete data');
-      const tree = buildCourseTree();
-      setCourseTree(tree);
-      console.log('Course tree updated with', tree.length, 'faculties');
-    }
-  }, [dataLoaded, courses, departments, faculties, scheduledCourses]);
-  
-  // Force re-render of the tree component when courseTree changes
-  const [treeKey, setTreeKey] = useState<number>(0);
-  useEffect(() => {
-    if (courseTree.length > 0) {
-      setTreeKey(prevKey => prevKey + 1);
-    }
-  }, [courseTree]);
+    // Time slots are now handled by TimetableCalendarView component
   
   // Fetch all necessary data
   const fetchData = async () => {
@@ -230,34 +204,105 @@ const TimetableScheduler: React.FC = () => {
       setDepartments(fetchedDepartments);
       setCourses(fetchedCourses);
       
-      // Fetch timetable with exam slots
-      if (timetable) {
-        const timetableResponse = await axios.get<TimetableResponse>(`${API_URL}/timetables/${timetable.id}?includeExamSlots=true`);
-        const fetchedTimetable = timetableResponse.data.timetable;
-        
-        // Convert exam slots to scheduled courses
-        if (fetchedTimetable.examSlots && fetchedTimetable.examSlots.length > 0) {
-          const scheduledCoursesFromSlots = fetchedTimetable.examSlots.map(slot => ({
-            id: slot.id,
-            course: slot.course,
-            day: new Date(slot.date),
-            timeSlot: slot.timeSlot
-          }));
-          
-          setScheduledCourses(scheduledCoursesFromSlots);
-        }
+      // Mark data as loaded after all state updates
+      setDataLoaded(true);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+      setError('Failed to load data. Please refresh the page.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Initialize weekdays from timetable date range and fetch data
+  useEffect(() => {
+    // If we have a timetable ID from URL, fetch that timetable
+    if (timetableIdFromUrl) {
+      fetchData();
+      fetchExistingTimetable(timetableIdFromUrl);
+    } else if (timetable) {
+      generateWeekDays(new Date(timetable.startDate), new Date(timetable.endDate));
+      fetchData();
+      // Set the current timetable from props
+      setCurrentTimetable(timetable);
+    } else {
+      // If no timetable data, redirect back to form
+      navigate('/admin/timetables/create');
+    }
+  }, [timetable, navigate, timetableIdFromUrl]);
+  
+  // Only rebuild course tree when all data is loaded and something changes
+  const [dataLoaded, setDataLoaded] = useState<boolean>(false);
+  
+  useEffect(() => {
+    // Only rebuild if we have all necessary data AND data has been fully loaded
+    if (dataLoaded && courses.length > 0 && departments.length > 0 && faculties.length > 0) {
+      console.log('Rebuilding course tree with complete data');
+      const tree = buildCourseTree();
+      setCourseTree(tree);
+      console.log('Course tree updated with', tree.length, 'faculties');
+    }
+  }, [dataLoaded, courses, departments, faculties, scheduledCourses]);
+  
+  // Force re-render of the tree component when courseTree changes
+  const [treeKey, setTreeKey] = useState<number>(0);
+  useEffect(() => {
+    if (courseTree.length > 0) {
+      setTreeKey(prevKey => prevKey + 1);
+    }
+  }, [courseTree]);
+  
+  // Fetch existing timetable data
+  const fetchExistingTimetable = async (timetableId: string) => {
+    try {
+      const timetableResponse = await axios.get<TimetableResponse>(`${API_URL}/timetables/${timetableId}?includeExamSlots=true`);
+      const fetchedTimetable = timetableResponse.data.timetable;
+      
+      // Set the timetable data
+      setCurrentTimetable(fetchedTimetable);
+      
+      // Update form fields
+      setFormData({
+        title: fetchedTimetable.title,
+        startDate: fetchedTimetable.startDate,
+        endDate: fetchedTimetable.endDate
+      });
+      
+      // Generate weekdays from the fetched timetable
+      if (fetchedTimetable.startDate && fetchedTimetable.endDate) {
+        generateWeekDays(new Date(fetchedTimetable.startDate), new Date(fetchedTimetable.endDate));
       }
       
+      // Convert exam slots to scheduled courses
+      if (fetchedTimetable.examSlots && fetchedTimetable.examSlots.length > 0) {
+        const scheduledCoursesFromSlots = fetchedTimetable.examSlots.map(slot => ({
+          id: slot.id,
+          course: slot.course,
+          day: new Date(slot.date),
+          timeSlot: slot.timeSlot
+        }));
+        
+        setScheduledCourses(scheduledCoursesFromSlots);
+        
+        // Update calendar key to force re-render
+        setCalendarKey(prevKey => prevKey + 1);
+      }
+      
+      // Show success message
+      setSnackbarMessage('Timetable loaded successfully for editing');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      
       // Mark data as loaded after all state updates
-      // This will trigger the useEffect to build the course tree
-      setLoading(false);
       setDataLoaded(true);
     } catch (err) {
+      console.error('Failed to load timetable data:', err);
       setError('Failed to load timetable data. Please try again.');
-      setLoading(false);
       setSnackbarMessage('Failed to load timetable data');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
+    } finally {
+      setLoading(false);
     }
   };
   
