@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useReactToPrint } from 'react-to-print';
+import { Box, Tabs, Tab } from '@mui/material';
+// Import the reusable TimetableCalendarView component
+import TimetableCalendarView from '../../components/TimetableCalendarView';
 
 interface Faculty {
   id: string;
@@ -56,6 +59,7 @@ const TimetableView: React.FC = () => {
   const [filterDepartment, setFilterDepartment] = useState<string>('');
   const [filterLevel, setFilterLevel] = useState<number | ''>('');
   const [showPrintView, setShowPrintView] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   
   // Ref for printing
   const printRef = useRef<HTMLDivElement>(null);
@@ -153,6 +157,16 @@ const TimetableView: React.FC = () => {
   };
 
   // Group exam slots by date
+  // Helper function to convert API exam slots to the format expected by TimetableCalendarView
+  const convertToScheduledCourses = (examSlots: ExamSlot[]) => {
+    return examSlots.map(slot => ({
+      id: slot.id,
+      course: slot.course,
+      day: new Date(slot.date),
+      timeSlot: slot.timeSlot
+    }));
+  };
+  
   const groupExamSlotsByDate = (examSlots: ExamSlot[]) => {
     const groupedSlots: Record<string, ExamSlot[]> = {};
     
@@ -198,6 +212,12 @@ const TimetableView: React.FC = () => {
     contentRef: printRef
   });
 
+  // Handle tab change between list and calendar views
+  const handleViewModeChange = (_event: React.SyntheticEvent, newValue: 'list' | 'calendar') => {
+    console.log('Changing view mode to:', newValue);
+    setViewMode(newValue);
+  };
+  
   const togglePrintView = () => {
     setShowPrintView(!showPrintView);
     if (!showPrintView) {
@@ -321,6 +341,17 @@ const TimetableView: React.FC = () => {
             </div>
           </div>
           
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+            <Tabs 
+              value={viewMode} 
+              onChange={handleViewModeChange}
+              aria-label="timetable view mode"
+            >
+              <Tab value="list" label="List View" />
+              <Tab value="calendar" label="Calendar View" />
+            </Tabs>
+          </Box>
+          
           <div className="timetable-filters">
             <div className="form-group">
               <label htmlFor="filterDepartment" className="form-label">
@@ -328,7 +359,6 @@ const TimetableView: React.FC = () => {
                 Filter by Department
               </label>
               <div className="form-control-icon">
-                <i className="fas fa-building form-icon"></i>
                 <select
                   id="filterDepartment"
                   name="filterDepartment"
@@ -352,7 +382,6 @@ const TimetableView: React.FC = () => {
                 Filter by Level
               </label>
               <div className="form-control-icon">
-                <i className="fas fa-layer-group form-icon"></i>
                 <select
                   id="filterLevel"
                   name="filterLevel"
@@ -384,38 +413,49 @@ const TimetableView: React.FC = () => {
           ) : filterExamSlots(selectedTimetable.examSlots).length === 0 ? (
             <div className="no-data">No exams match the selected filters.</div>
           ) : (
-            <div className="exam-schedule">
-              {groupExamSlotsByDate(filterExamSlots(selectedTimetable.examSlots)).map(({ date, slots }) => (
-                <div key={date} className="exam-day">
-                  <div className="day-header">
-                    <h3>{new Date(date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
-                  </div>
-                  
-                  <table className="exam-table">
-                    <thead>
-                      <tr>
-                        <th>Time</th>
-                        <th>Course Code</th>
-                        <th>Course Title</th>
-                        <th>Department</th>
-                        <th>Level</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {slots.map(slot => (
-                        <tr key={slot.id}>
-                          <td>{timeSlotMap[slot.timeSlot]}</td>
-                          <td>{slot.course.code}</td>
-                          <td>{slot.course.title}</td>
-                          <td>{slot.course.department.name}</td>
-                          <td>{slot.course.level}</td>
+            viewMode === 'list' ? (
+              <div className="exam-schedule">
+                {groupExamSlotsByDate(filterExamSlots(selectedTimetable.examSlots)).map(({ date, slots }) => (
+                  <div key={date} className="exam-day">
+                    <div className="day-header">
+                      <h3>{new Date(date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
+                    </div>
+                    
+                    <table className="exam-table">
+                      <thead>
+                        <tr>
+                          <th>Time</th>
+                          <th>Course Code</th>
+                          <th>Course Title</th>
+                          <th>Department</th>
+                          <th>Level</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
-            </div>
+                      </thead>
+                      <tbody>
+                        {slots.map(slot => (
+                          <tr key={slot.id}>
+                            <td>{timeSlotMap[slot.timeSlot]}</td>
+                            <td>{slot.course.code}</td>
+                            <td>{slot.course.title}</td>
+                            <td>{slot.course.department.name}</td>
+                            <td>{slot.course.level}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Box sx={{ height: 'calc(100vh - 350px)', width: '100%' }}>
+                <TimetableCalendarView
+                  scheduledCourses={convertToScheduledCourses(filterExamSlots(selectedTimetable.examSlots))}
+                  readOnly={true}
+                  startDate={selectedTimetable.startDate ? new Date(selectedTimetable.startDate) : undefined}
+                  endDate={selectedTimetable.endDate ? new Date(selectedTimetable.endDate) : undefined}
+                />
+              </Box>
+            )
           )}
         </div>
       )}

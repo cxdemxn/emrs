@@ -31,8 +31,11 @@ import { SimpleTreeView, TreeItem } from '@mui/x-tree-view';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
-// Import the DraggableCourse and DroppableTimeSlot components
-import { DraggableCourse, DroppableTimeSlot } from './components';
+// Import the DraggableCourse component
+import { DraggableCourse } from './components';
+// Import the reusable TimetableCalendarView component
+// Import from index file to ensure all components are properly loaded
+import { TimetableCalendarView } from '../../components';
 
 // API URL
 const API_URL = 'http://localhost:5000/api';
@@ -147,7 +150,7 @@ const TimetableScheduler: React.FC = () => {
   const [scheduledCourses, setScheduledCourses] = useState<ScheduledCourse[]>([]);
   const [, setLoading] = useState<boolean>(false);
   const [, setError] = useState<string | null>(null);
-  
+  const [calendarKey, setCalendarKey] = useState<number>(0); // Add a key to force re-render
   // State for UI
   const [weekDays, setWeekDays] = useState<Date[]>([]);
   const [isAutoScheduling, setIsAutoScheduling] = useState(false);
@@ -685,7 +688,9 @@ const handleAutoSchedule = async () => {
       
       // Update scheduled courses state
       if (typeof setScheduledCourses === 'function') {
-        setScheduledCourses([...scheduledCourses, newScheduledCourse]);
+        setScheduledCourses(prevCourses => [...prevCourses, newScheduledCourse]);
+        // Force calendar to re-render
+        setCalendarKey(prevKey => prevKey + 1);
       }
       
       // Update conflict status
@@ -800,7 +805,7 @@ const confirmPublish = async () => {
     
     // Navigate back to timetables list after successful publish
     setTimeout(() => {
-      navigate('/admin/timetables/view', { replace: true });
+      navigate('/admin/timetables', { replace: true });
     }, 2000);
   } catch (error) {
     setSnackbarMessage('Failed to publish timetable');
@@ -1019,111 +1024,15 @@ if (!timetable) {
           
           {/* Right Column: Calendar Grid */}
           <Grid sx={{ gridColumn: { xs: 'span 12', md: 'span 8', lg: 'span 9' } }}>
-            <Paper 
-              elevation={2} 
-              sx={{ 
-                p: 2, 
-                height: 'calc(100vh - 200px)', 
-                overflow: 'auto'
-              }}
-            >
-              <Box 
-                sx={{ 
-                  display: 'grid',
-                  gridTemplateColumns: '100px repeat(5, 1fr)',
-                  gap: 1,
-                  mb: 2
-                }}
-              >
-                {/* Empty cell for top-left corner */}
-                <Box sx={{ backgroundColor: '#f5f5f5', p: 1 }}></Box>
-                
-                {/* Day headers */}
-                {weekDays.slice(0, 5).map((day, index) => (
-                  <Box 
-                    key={index} 
-                    sx={{ 
-                      backgroundColor: '#f5f5f5', 
-                      p: 1, 
-                      textAlign: 'center',
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    {format(day, 'EEE')}
-                    <br />
-                    {format(day, 'MMM d')}
-                  </Box>
-                ))}
-                
-                {/* Time slots and calendar cells */}
-                {TIME_SLOTS.map((timeSlot, timeIndex) => (
-                  <React.Fragment key={timeSlot}>
-                    {/* Time slot label */}
-                    <Box 
-                      sx={{ 
-                        backgroundColor: '#f5f5f5', 
-                        p: 1, 
-                        textAlign: 'center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.85rem'
-                      }}
-                    >
-                      {TIME_SLOT_MAP[timeSlot]}
-                    </Box>
-                    
-                    {/* Calendar cells for this time slot */}
-                    {weekDays.slice(0, 5).map((day, dayIndex) => (
-                      <DroppableTimeSlot
-                        key={`${dayIndex}-${timeIndex}`}
-                        day={day}
-                        timeSlot={timeSlot}
-                        onDrop={(courseId) => handleCourseDrop(courseId, day, timeSlot)}
-                        scheduledCourses={scheduledCourses}
-                        onRemove={handleRemoveCourse}
-                        departmentLevelColors={DEPARTMENT_LEVEL_COLORS}
-                      />
-                    ))}
-                    
-                    {/* Add lunch break row after the second time slot */}
-                    {timeIndex === 1 && (
-                      <React.Fragment>
-                        <Box 
-                          sx={{ 
-                            backgroundColor: '#eeeeee', 
-                            p: 1, 
-                            textAlign: 'center',
-                            gridColumn: '1 / 2',
-                            fontSize: '0.85rem',
-                            fontStyle: 'italic'
-                          }}
-                        >
-                          Lunch Break
-                          <br />
-                          12-1 PM
-                        </Box>
-                        
-                        {weekDays.slice(0, 5).map((_, dayIndex) => (
-                          <Box 
-                            key={`lunch-${dayIndex}`} 
-                            sx={{ 
-                              backgroundColor: '#eeeeee', 
-                              p: 1,
-                              textAlign: 'center',
-                              fontStyle: 'italic',
-                              color: '#666'
-                            }}
-                          >
-                            Lunch Break
-                          </Box>
-                        ))}
-                      </React.Fragment>
-                    )}
-                  </React.Fragment>
-                ))}
-              </Box>
-            </Paper>
+            {/* Using the reusable TimetableCalendarView component */}
+            <TimetableCalendarView
+              key={calendarKey} // Add key to force re-render when courses change
+              scheduledCourses={scheduledCourses}
+              onCourseDrop={handleCourseDrop}
+              onRemoveCourse={handleRemoveCourse}
+              startDate={timetable?.startDate ? new Date(timetable.startDate) : undefined}
+              endDate={timetable?.endDate ? new Date(timetable.endDate) : undefined}
+            />
           </Grid>
         </Grid>
         
