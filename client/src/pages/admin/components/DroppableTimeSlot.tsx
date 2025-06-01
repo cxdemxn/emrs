@@ -43,7 +43,15 @@ export const DroppableTimeSlot: React.FC<DroppableTimeSlotProps> = (props) => {
   
   // Find all scheduled courses for this slot
   const scheduledCoursesForSlot = React.useMemo(() => {
+    if (!scheduledCourses || scheduledCourses.length === 0) {
+      return [];
+    }
+    
     return scheduledCourses.filter(sc => {
+      if (!sc || !sc.day) {
+        return false;
+      }
+      
       // Ensure both dates are Date objects
       const scDay = sc.day instanceof Date ? sc.day : new Date(sc.day);
       const slotDay = day instanceof Date ? day : new Date(day);
@@ -53,9 +61,6 @@ export const DroppableTimeSlot: React.FC<DroppableTimeSlotProps> = (props) => {
       const scDayString = scDay.toISOString().split('T')[0];
       const slotDayString = slotDay.toISOString().split('T')[0];
       const sameDay = scDayString === slotDayString;
-      
-      // Debug logging to help identify date comparison issues
-      console.log(`Comparing: SC day=${scDayString}, Slot day=${slotDayString}, Same day=${sameDay}, Time slots: ${sc.timeSlot} vs ${timeSlot}`);
       
       // Return true if both date and time slot match
       return sameDay && sc.timeSlot === timeSlot;

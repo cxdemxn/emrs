@@ -299,11 +299,26 @@ const TimetableScheduler: React.FC = () => {
   
   // Count exams for a department-level on a specific day
   const countExamsForDepartmentLevelOnDay = (departmentId: string, level: number, day: Date): number => {
-    return scheduledCourses.filter(sc => 
-      sc.course.department.id === departmentId && 
-      sc.course.level === level && 
-      sc.day.toDateString() === day.toDateString()
-    ).length;
+    // Ensure we have a valid day
+    if (!day) return 0;
+    
+    // Convert the day to a string format for comparison (YYYY-MM-DD)
+    const dayString = day.toISOString().split('T')[0];
+    
+    return scheduledCourses.filter(sc => {
+      // Skip invalid scheduled courses
+      if (!sc || !sc.course || !sc.day) return false;
+      
+      // Ensure sc.day is a Date object
+      const scDay = sc.day instanceof Date ? sc.day : new Date(sc.day);
+      
+      // Convert to string format for reliable comparison
+      const scDayString = scDay.toISOString().split('T')[0];
+      
+      return sc.course.department.id === departmentId && 
+             sc.course.level === level && 
+             scDayString === dayString;
+    }).length;
   };
   
   // Update conflict status
@@ -340,21 +355,36 @@ const TimetableScheduler: React.FC = () => {
   
   // Check for conflicts when scheduling a course
   const checkForConflicts = (course: Course, day: Date, timeSlot: string): 'none' | 'warning' | 'error' => {
+    if (!course || !day || !timeSlot) {
+      return 'error'; // Invalid input
+    }
+    
+    // Convert the day to a string format for comparison (YYYY-MM-DD)
+    const dayString = day.toISOString().split('T')[0];
+    
     // Count exams for this department-level on this day
     const examCount = countExamsForDepartmentLevelOnDay(course.department.id, course.level, day);
     
     // Check if this department-level already has an exam in this time slot on this day
-    const timeSlotConflict = scheduledCourses.some(sc => 
-      sc.day.toDateString() === day.toDateString() && 
-      sc.timeSlot === timeSlot &&
-      sc.course.department.id === course.department.id &&
-      sc.course.level === course.level
-    );
+    const timeSlotConflict = scheduledCourses.some(sc => {
+      if (!sc || !sc.course || !sc.day) return false;
+      
+      // Ensure sc.day is a Date object
+      const scDay = sc.day instanceof Date ? sc.day : new Date(sc.day);
+      
+      // Convert to string format for reliable comparison
+      const scDayString = scDay.toISOString().split('T')[0];
+      
+      return scDayString === dayString && 
+             sc.timeSlot === timeSlot &&
+             sc.course.department.id === course.department.id &&
+             sc.course.level === course.level;
+    });
     
     if (timeSlotConflict) {
       return 'error'; // Cannot schedule two exams from the same department-level in the same time slot
     }
-    
+     
     // Check for forced break day: if the previous weekday had 2+ exams for this department-level
     // Find the previous weekday
     let prevDay = new Date(day);
@@ -363,7 +393,7 @@ const TimetableScheduler: React.FC = () => {
     while (isWeekend(prevDay)) {
       prevDay.setDate(prevDay.getDate() - 1);
     }
-    
+  
     const prevDayExamCount = countExamsForDepartmentLevelOnDay(course.department.id, course.level, prevDay);
     if (prevDayExamCount >= 2) {
       return 'error'; // Forced break day after a department-level had 2+ exams
@@ -397,7 +427,7 @@ const TimetableScheduler: React.FC = () => {
         `${API_URL}/timetables/${timetable.id}/auto-schedule`,
         { departmentIds, levels }
       );
-      console.log('we get here ')
+      
       // Convert returned exam slots to scheduled courses
       if (response.data.examSlots && response.data.examSlots.length > 0) {
         console.log('Auto-scheduled exam slots:', response.data.examSlots);
@@ -406,7 +436,6 @@ const TimetableScheduler: React.FC = () => {
         const autoScheduledCourses = response.data.examSlots.map(slot => {
           // Create a proper date object from the server response
           const dateObj = new Date(slot.date);
-          console.log(`Original date from server: ${slot.date}, converted to: ${dateObj.toISOString()}`);
           
           return {
             id: slot.id,
@@ -416,14 +445,17 @@ const TimetableScheduler: React.FC = () => {
           };
         });
         
-        console.log('Processed auto-scheduled courses:', autoScheduledCourses);
-        console.log('Current weekDays:', weekDays.map(d => d.toISOString()));
-        
-        // Update the scheduled courses state
+        // Update the scheduled courses state with the new auto-scheduled courses
+        // We completely replace the scheduled courses with the new ones from the server
+        // since the server has deleted any previous exam slots for these courses
         setScheduledCourses(autoScheduledCourses);
-        updateConflictStatus();
         
-        setSnackbarMessage('Auto-scheduling completed successfully');
+        // Update conflict status after setting scheduled courses
+        setTimeout(() => {
+          updateConflictStatus();
+        }, 0);
+        
+        setSnackbarMessage(`Successfully auto-scheduled ${autoScheduledCourses.length} exams`);
         setSnackbarSeverity('success');
         setSnackbarOpen(true);
       } else {

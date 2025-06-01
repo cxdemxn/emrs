@@ -849,28 +849,47 @@ export const autoScheduleExams = async (req: Request, res: Response) => {
       // End of this dept-level's two passes
     }
 
-    // ─── 9) Persist All Scheduled Exams in a Single Transaction ─────────────
+    // ─── 9) Collect all course IDs being scheduled ─────────────────────────
+    const courseIdsToSchedule = scheduledExams.map(exam => exam.courseId);
+    
+    // ─── 10) Persist All Scheduled Exams in a Single Transaction ─────────────
     if (scheduledExams.length > 0) {
       Logger.info(`Attempting to create ${scheduledExams.length} new exam slots`);
-      const createdExamSlots = await prisma.$transaction(
-        scheduledExams.map((exam) =>
-          prisma.examSlot.create({
-            data: {
-              timetableId: exam.timetableId,
-              courseId: exam.courseId,
-              date: exam.date,
-              timeSlot: exam.timeSlot
-            },
-            include: {
-              course: {
-                include: {
-                  department: true
+      
+      // First delete any existing exam slots for these courses in this timetable
+      // Then create the new exam slots
+      // All in a single transaction
+      const createdExamSlots = await prisma.$transaction(async (tx) => {
+        // Delete existing exam slots for these courses in this timetable
+        Logger.info(`Deleting existing exam slots for ${courseIdsToSchedule.length} courses in timetable ${id}`);
+        await tx.examSlot.deleteMany({
+          where: {
+            timetableId: id,
+            courseId: { in: courseIdsToSchedule }
+          }
+        });
+        
+        // Create new exam slots
+        return await Promise.all(
+          scheduledExams.map((exam) =>
+            tx.examSlot.create({
+              data: {
+                timetableId: exam.timetableId,
+                courseId: exam.courseId,
+                date: exam.date,
+                timeSlot: exam.timeSlot
+              },
+              include: {
+                course: {
+                  include: {
+                    department: true
+                  }
                 }
               }
-            }
-          })
-        )
-      );
+            })
+          )
+        );
+      });
 
       Logger.info(`Successfully scheduled ${createdExamSlots.length} exams`);
       res.status(200).json({
