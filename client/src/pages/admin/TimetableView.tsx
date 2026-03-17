@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useReactToPrint } from 'react-to-print';
 import { Box, Tabs, Tab } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { API_URL } from '../../config/api';
 // Import the reusable TimetableCalendarView component
 import TimetableCalendarView from '../../components/TimetableCalendarView';
@@ -53,6 +53,7 @@ const timeSlotMap: Record<string, string> = {
 
 const TimetableView: React.FC = () => {
   const navigate = useNavigate();
+  const { timetableId } = useParams<{ timetableId?: string }>();
   const [timetables, setTimetables] = useState<Timetable[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -71,6 +72,16 @@ const TimetableView: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+useEffect(() => {
+    // If timetableId is provided in URL, automatically select that timetable
+    if (timetableId && timetables.length > 0) {
+      const timetable = timetables.find(t => t.id === timetableId);
+      if (timetable) {
+        handleTimetableSelect(timetable.id);
+      }
+    }
+  }, [timetableId, timetables]);
 
   const fetchData = async () => {
     try {

@@ -101,6 +101,13 @@ function App() {
               </AdminLayout>
             </ProtectedRoute>
           } />
+          <Route path="/admin/timetables/view/:timetableId" element={
+            <ProtectedRoute requiredRole="ADMIN">
+              <AdminLayout>
+                <TimetableView />
+              </AdminLayout>
+            </ProtectedRoute>
+          } />
           <Route path="/admin/timetables/create" element={
             <ProtectedRoute requiredRole="ADMIN">
               <AdminLayout>
