@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../utils/prisma';
 import { PrismaClient, TimeSlot } from '../../generated/prisma';
 import Logger from '../utils/logger';
+import { sendNotificationToStudent } from '../routes/notifications';
 
 // Helper function to check if a date is a weekday (not Saturday or Sunday)
 const isWeekday = (date: Date): boolean => {
@@ -355,7 +356,7 @@ export const publishTimetable = async (req: Request, res: Response) => {
     const students = await prisma.student.findMany();
 
     Logger.info(`Creating notifications for ${students.length} students`);
-    await prisma.$transaction(
+    const notifications = await prisma.$transaction(
       students.map(student => 
         prisma.notification.create({
           data: {
@@ -365,6 +366,18 @@ export const publishTimetable = async (req: Request, res: Response) => {
         })
       )
     );
+
+    // Send real-time notifications via SSE
+    Logger.debug('Sending real-time notifications via SSE');
+    students.forEach((student, index) => {
+      const notification = notifications[index];
+      sendNotificationToStudent(student.id, {
+        id: notification.id,
+        message: notification.message,
+        createdAt: notification.createdAt,
+        isRead: notification.isRead
+      });
+    });
 
     Logger.info(`Timetable published successfully: ${updatedTimetable.id}`);
     Logger.info(`Timetable published successfully: ${updatedTimetable.id}`);
@@ -467,27 +480,35 @@ export const addExamSlot = async (req: Request, res: Response) => {
 
     // Create exam slot
     Logger.debug(`Creating exam slot for course: ${courseId}`);
-    const examSlot = await prisma.examSlot.create({
-      data: {
-        date: parsedDate,
-        timeSlot: timeSlot as TimeSlot,
-        courseId,
-        timetableId: id
-      },
-      include: {
-        course: {
-          include: {
-            department: true
+    try {
+      const examSlot = await prisma.examSlot.create({
+        data: {
+          date: parsedDate,
+          timeSlot: timeSlot as TimeSlot,
+          courseId,
+          timetableId: id
+        },
+        include: {
+          course: {
+            include: {
+              department: true
+            }
           }
         }
-      }
-    });
+      });
 
-    Logger.info(`Exam slot added successfully: ${examSlot.id}`);
-    res.status(201).json({
-      message: 'Exam slot added successfully',
-      examSlot
-    });
+      Logger.info(`Exam slot added successfully: ${examSlot.id}`);
+      res.status(201).json({
+        message: 'Exam slot added successfully',
+        examSlot
+      });
+    } catch (createError: any) {
+      // Handle Prisma unique constraint violation
+      if (createError.code === 'P2002') {
+        return res.status(400).json({ message: 'An exam is already scheduled at this time slot' });
+      }
+      throw createError;
+    }
   } catch (error) {
     Logger.error('Add exam slot error:', error);
     res.status(500).json({ message: 'Server error' });

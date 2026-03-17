@@ -11,7 +11,6 @@ import Dashboard from './pages/admin/Dashboard';
 import FacultyManagement from './pages/admin/FacultyManagement';
 import DepartmentManagement from './pages/admin/DepartmentManagement';
 import CourseManagement from './pages/admin/CourseManagement';
-// import TimetableCreation from './pages/admin/TimetableCreation';
 import TimetableView from './pages/admin/TimetableView';
 import CreateTimetableForm from './pages/admin/CreateTimetableForm';
 import TimetableScheduler from './pages/admin/TimetableScheduler';
@@ -95,13 +94,6 @@ function App() {
               </AdminLayout>
             </ProtectedRoute>
           } />
-          {/* <Route path="/admin/timetables/create" element={
-            <ProtectedRoute requiredRole="ADMIN">
-              <AdminLayout>
-                <TimetableCreation />
-              </AdminLayout>
-            </ProtectedRoute>
-          } /> */}
           <Route path="/admin/timetables/view" element={
             <ProtectedRoute requiredRole="ADMIN">
               <AdminLayout>

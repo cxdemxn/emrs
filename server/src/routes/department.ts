@@ -11,7 +11,10 @@ import { authenticate, isAdmin } from '../middleware/auth';
 
 const router = express.Router();
 
-// All department routes require authentication
+// Get department by ID (public route for student registration)
+router.get('/:id', getDepartmentById as RequestHandler);
+
+// All other department routes require authentication
 router.use(authenticate as RequestHandler);
 
 // Create department (admin only)
@@ -19,9 +22,6 @@ router.post('/', isAdmin as RequestHandler, createDepartment as RequestHandler);
 
 // Get all departments
 router.get('/', getAllDepartments as RequestHandler);
-
-// Get department by ID
-router.get('/:id', getDepartmentById as RequestHandler);
 
 // Update department (admin only)
 router.put('/:id', isAdmin as RequestHandler, updateDepartment as RequestHandler);

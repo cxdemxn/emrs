@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { API_URL } from '../../config/api';
 
 interface Department {
   id: string;
@@ -26,8 +27,6 @@ const StudentRegister: React.FC = () => {
   const navigate = useNavigate();
   const { departmentId, registrationCode } = useParams<{ departmentId: string; registrationCode: string }>();
   
-  // API base URL
-  const API_URL = 'http://localhost:5000/api';
   
   useEffect(() => {
     // Validate registration code and fetch department details
@@ -40,7 +39,7 @@ const StudentRegister: React.FC = () => {
         }
         
         const response = await axios.get(`${API_URL}/departments/${departmentId}`);
-        const departmentData = response.data.department;
+        const departmentData = (response.data as any).department;
         
         if (departmentData.registrationCode !== registrationCode) {
           setError('Invalid registration code');
@@ -87,13 +86,13 @@ const StudentRegister: React.FC = () => {
         registrationCode
       });
       
-      const { token } = response.data;
+      const { token } = response.data as any;
       
       // Store token and user info
       localStorage.setItem('token', token);
       localStorage.setItem('userRole', 'STUDENT');
-      localStorage.setItem('userId', response.data.student.id);
-      localStorage.setItem('userName', response.data.student.name);
+      localStorage.setItem('userId', (response.data as any).student.id);
+      localStorage.setItem('userName', (response.data as any).student.name);
       
       navigate('/student');
     } catch (err: any) {

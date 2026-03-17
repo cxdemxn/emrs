@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useReactToPrint } from 'react-to-print';
 import { Box, Tabs, Tab } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { API_URL } from '../../config/api';
 // Import the reusable TimetableCalendarView component
 import TimetableCalendarView from '../../components/TimetableCalendarView';
 
@@ -66,8 +67,6 @@ const TimetableView: React.FC = () => {
   // Ref for printing
   const printRef = useRef<HTMLDivElement>(null);
   
-  // API base URL
-  const API_URL = 'http://localhost:5000/api';
 
   useEffect(() => {
     fetchData();

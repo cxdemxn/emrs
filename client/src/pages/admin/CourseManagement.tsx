@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_URL } from '../../config/api';
 
 interface Faculty {
   id: string;
@@ -48,8 +49,6 @@ const CourseManagement: React.FC = () => {
   const [filterDepartment, setFilterDepartment] = useState<string>('');
   const [filterLevel, setFilterLevel] = useState<number | ''>('');
   
-  // API base URL
-  const API_URL = 'http://localhost:5000/api';
 
   useEffect(() => {
     fetchData();

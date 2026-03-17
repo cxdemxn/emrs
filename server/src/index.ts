@@ -7,6 +7,7 @@ import departmentRoutes from './routes/department';
 import courseRoutes from './routes/course';
 import timetableRoutes from './routes/timetable';
 import studentRoutes from './routes/student';
+import notificationRoutes from './routes/notifications';
 import { prisma } from './utils/prisma';
 import Logger from './utils/logger';
 import { requestLogger, errorLogger } from './middleware/logger.middleware';
@@ -32,6 +33,7 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/timetables', timetableRoutes);
 app.use('/api/students', studentRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {

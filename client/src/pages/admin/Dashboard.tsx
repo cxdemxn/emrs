@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_URL } from '../../config/api';
 
 interface Faculty {
   id: string;
@@ -40,8 +41,6 @@ const Dashboard: React.FC = () => {
   
   const navigate = useNavigate();
   
-  // API base URL
-  const API_URL = 'http://localhost:5000/api';
 
   // Define response types for type safety
   interface FacultiesResponse {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_URL } from '../../config/api';
 import { 
   Box, 
   Button, 
@@ -37,8 +38,6 @@ import { DraggableCourse } from './components';
 // Import from index file to ensure all components are properly loaded
 import { TimetableCalendarView } from '../../components';
 
-// API URL
-const API_URL = 'http://localhost:5000/api';
 
 // Types
 interface Timetable {

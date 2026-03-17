@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_URL } from '../../config/api';
 import { 
   Box, 
   Paper, 
@@ -31,7 +32,6 @@ interface TimetableResponse {
   };
 }
 
-const API_URL = 'http://localhost:5000/api';
 
 const CreateTimetableForm: React.FC<CreateTimetableFormProps> = () => {
   const navigate = useNavigate();

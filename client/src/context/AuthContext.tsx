@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import axios from 'axios';
+import { API_URL } from '../config/api';
 
 interface User {
   id: string;
@@ -49,8 +50,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [userName, setUserName] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
 
-  // API base URL
-  const API_URL = 'http://localhost:5000/api';
 
   useEffect(() => {
     // Check if user is authenticated

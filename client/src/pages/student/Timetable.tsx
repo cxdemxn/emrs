@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useReactToPrint } from 'react-to-print';
 import { useAuth } from '../../context/AuthContext';
+import { API_URL } from '../../config/api';
 
 interface Department {
   id: string;
@@ -65,8 +66,6 @@ const StudentTimetable: React.FC = () => {
   // Ref for printing
   const printRef = useRef<HTMLDivElement>(null);
   
-  // API base URL
-  const API_URL = 'http://localhost:5000/api';
 
   useEffect(() => {
     fetchData();

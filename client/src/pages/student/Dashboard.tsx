@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import { API_URL } from '../../config/api';
 
 interface Notification {
   id: string;
@@ -36,11 +37,42 @@ const StudentDashboard: React.FC = () => {
   const { userId } = useAuth();
   const navigate = useNavigate();
   
-  // API base URL
-  const API_URL = 'http://localhost:5000/api';
 
   useEffect(() => {
     fetchData();
+    
+    // Set up SSE connection for real-time notifications
+    if (userId) {
+      const eventSource = new EventSource(`${API_URL}/notifications/stream?token=${userId}`);
+      
+      eventSource.addEventListener('notification', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          // Add new notification to the top of the list
+          setNotifications(prev => [data, ...prev]);
+        } catch (error) {
+          console.error('Error parsing SSE notification:', error);
+        }
+      });
+      
+      eventSource.addEventListener('connected', () => {
+        console.log('Connected to notification stream');
+      });
+      
+      eventSource.addEventListener('ping', () => {
+        // Keep-alive ping, no action needed
+      });
+      
+      eventSource.onerror = (error) => {
+        console.error('SSE connection error:', error);
+        eventSource.close();
+      };
+      
+      // Clean up on unmount
+      return () => {
+        eventSource.close();
+      };
+    }
   }, [userId]);
 
   const fetchData = async () => {

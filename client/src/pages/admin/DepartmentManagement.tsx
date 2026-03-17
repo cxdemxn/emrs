@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_URL } from '../../config/api';
 
 interface Faculty {
   id: string;
@@ -37,8 +38,6 @@ const DepartmentManagement: React.FC = () => {
   const [showQRCode, setShowQRCode] = useState<boolean>(false);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   
-  // API base URL
-  const API_URL = 'http://localhost:5000/api';
 
   useEffect(() => {
     fetchData();

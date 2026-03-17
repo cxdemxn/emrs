@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_URL } from '../../config/api';
 
 interface Faculty {
   id: string;
@@ -32,8 +33,6 @@ const FacultyManagement: React.FC = () => {
   const [currentFacultyId, setCurrentFacultyId] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
   
-  // API base URL
-  const API_URL = 'http://localhost:5000/api';
 
   useEffect(() => {
     fetchFaculties();
