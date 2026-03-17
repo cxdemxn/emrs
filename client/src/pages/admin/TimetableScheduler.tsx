@@ -153,6 +153,7 @@ const TimetableScheduler: React.FC = () => {
   const [scheduledCourses, setScheduledCourses] = useState<ScheduledCourse[]>([]);
   const [, setLoading] = useState<boolean>(false);
   const [, setError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [calendarKey, setCalendarKey] = useState<number>(0); // Add a key to force re-render
   const [currentTimetable, setCurrentTimetable] = useState<Timetable | null>(null);
   currentTimetable;
@@ -224,11 +225,11 @@ formData
       fetchData();
       // Set the current timetable from props
       setCurrentTimetable(timetable);
-    } else {
-      // If no timetable data, redirect back to form
+    } else if (!fetchError) {
+      // If no timetable data and no error, redirect back to form
       navigate('/admin/timetables/create');
     }
-  }, [timetable, navigate, timetableIdFromUrl]);
+  }, [timetable, navigate, timetableIdFromUrl, fetchError]);
   
   // Only rebuild course tree when all data is loaded and something changes
   const [dataLoaded, setDataLoaded] = useState<boolean>(false);
@@ -254,7 +255,7 @@ formData
   // Fetch existing timetable data
   const fetchExistingTimetable = async (timetableId: string) => {
     try {
-      const timetableResponse = await axios.get<TimetableResponse>(`${API_URL}/timetables/${timetableId}?includeExamSlots=true`);
+      const timetableResponse = await axios.get<TimetableResponse>(`${API_URL}/timetables/${timetableId}`);
       const fetchedTimetable = timetableResponse.data.timetable;
       
       // Set the timetable data
@@ -294,12 +295,15 @@ formData
       
       // Mark data as loaded after all state updates
       setDataLoaded(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load timetable data:', err);
-      setError('Failed to load timetable data. Please try again.');
-      setSnackbarMessage('Failed to load timetable data');
+      const errorMessage = err.response?.data?.message || 'Failed to load timetable data. Please try again.';
+      setError(errorMessage);
+      setFetchError(errorMessage);
+      setSnackbarMessage(errorMessage);
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
+      // Don't redirect, let user see the error and potentially retry
     } finally {
       setLoading(false);
     }
