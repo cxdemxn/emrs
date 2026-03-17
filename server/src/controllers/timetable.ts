@@ -450,17 +450,16 @@ export const addExamSlot = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Invalid time slot' });
     }
 
-    // Check if slot is already taken
+    // Check if course is already scheduled in this timetable
     const existingSlot = await prisma.examSlot.findFirst({
       where: {
         timetableId: id,
-        date: parsedDate,
-        timeSlot: timeSlot as TimeSlot
+        courseId
       }
     });
 
     if (existingSlot) {
-      return res.status(400).json({ message: 'This time slot is already taken' });
+      return res.status(400).json({ message: 'This course is already scheduled in this timetable' });
     }
 
     // Count exams for this department-level on this date
