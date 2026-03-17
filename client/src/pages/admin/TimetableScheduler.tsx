@@ -573,12 +573,12 @@ const handleAutoSchedule = async () => {
     // Get unique levels from courses
     const levels = Array.isArray(courses) ? [...new Set(courses.map((course: Course) => course.level))] : [];
 
-    if (!timetable || !timetable.id) {
+    if (!currentTimetable || !currentTimetable.id) {
       console.error('Timetable ID is undefined');
       if (typeof setSnackbarMessage === 'function' && 
           typeof setSnackbarSeverity === 'function' && 
           typeof setSnackbarOpen === 'function') {
-        setSnackbarMessage('Timetable ID is undefined');
+        setSnackbarMessage('Timetable data is not available');
         setSnackbarSeverity('error');
         setSnackbarOpen(true);
       }
@@ -590,7 +590,7 @@ const handleAutoSchedule = async () => {
 
     // Call auto-schedule API endpoint with required data
     const response = await axios.post<ExamSlotsResponse>(
-      `${API_URL}/timetables/${timetable.id}/auto-schedule`,
+      `${API_URL}/timetables/${currentTimetable.id}/auto-schedule`,
       { departmentIds, levels }
     );
 
@@ -602,7 +602,7 @@ const handleAutoSchedule = async () => {
 
       // After auto-scheduling, fetch all exam slots for this timetable to get the complete picture
       const allSlotsResponse = await axios.get<ExamSlotsResponse>(
-        `${API_URL}/timetables/${timetable.id}/exam-slots`
+        `${API_URL}/timetables/${currentTimetable.id}/exam-slots`
       );
       
       console.log('All slots response:', allSlotsResponse.data);
@@ -711,14 +711,14 @@ const handleAutoSchedule = async () => {
     }
     
     try {
-      if (!timetable || !timetable.id) {
+      if (!currentTimetable || !currentTimetable.id) {
         console.error('Timetable ID is undefined');
         return;
       }
       
       // Call API to add exam slot
       const response = await axios.post<ExamSlotResponse>(
-        `${API_URL}/timetables/${timetable.id}/exam-slots`,
+        `${API_URL}/timetables/${currentTimetable.id}/exam-slots`,
         {
           courseId,
           date: format(day, 'yyyy-MM-dd'),
@@ -774,8 +774,13 @@ const handleAutoSchedule = async () => {
 // Remove a scheduled course
 const handleRemoveCourse = async (scheduledCourseId: string) => {
   try {
+    if (!currentTimetable?.id) {
+      console.error('Cannot remove course: timetable ID is not available');
+      return;
+    }
+    
     // Call API to remove exam slot
-    await axios.delete(`${API_URL}/timetables/${timetable.id}/exam-slots/${scheduledCourseId}`);
+    await axios.delete(`${API_URL}/timetables/${currentTimetable.id}/exam-slots/${scheduledCourseId}`);
     
     // Update state by filtering out the removed course
     setScheduledCourses(scheduledCourses.filter(sc => sc.id !== scheduledCourseId));
@@ -798,11 +803,16 @@ const handleSaveDraft = async () => {
   setIsSaving(true);
   
   try {
+    if (!currentTimetable?.id) {
+      console.error('Cannot save draft: timetable ID is not available');
+      return;
+    }
+    
     // Call API to save draft
     await axios.put<TimetableResponse>(
-      `${API_URL}/timetables/${timetable.id}`,
+      `${API_URL}/timetables/${currentTimetable.id}`,
       {
-        ...timetable,
+        ...currentTimetable,
         isPublished: false
       }
     );
@@ -837,9 +847,14 @@ const confirmPublish = async () => {
   setIsPublishing(true);
   
   try {
+    if (!currentTimetable?.id) {
+      console.error('Cannot publish: timetable ID is not available');
+      return;
+    }
+    
     // Call API to publish timetable
     await axios.put<TimetableResponse>(
-      `${API_URL}/timetables/${timetable.id}/publish`,
+      `${API_URL}/timetables/${currentTimetable.id}/publish`,
       {}
     );
     
@@ -869,8 +884,8 @@ const handleCloseSnackbar = () => {
   setSnackbarOpen(false);
 };
 
-// If no timetable data, show loading or redirect
-if (!timetable) {
+// If no timetable data and no ongoing fetch, show loading or redirect
+if (!currentTimetable && !timetableIdFromUrl && !fetchError) {
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h5">No timetable data found. Please create a timetable first.</Typography>
@@ -880,11 +895,20 @@ if (!timetable) {
           onClick={() => navigate('/admin/timetables/create')}
           sx={{ mt: 2 }}
         >
-          Create Timetable
+          CREATE TIMETABLE
         </Button>
-      </Box>
-    );
-  }
+    </Box>
+  );
+}
+
+// Show loading while fetching timetable
+if (timetableIdFromUrl && !currentTimetable && !fetchError) {
+  return (
+    <Box sx={{ p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+      <Typography variant="h6">Loading timetable for editing...</Typography>
+    </Box>
+  );
+} 
   
   return (
     <DndProvider backend={HTML5Backend}>
@@ -902,10 +926,10 @@ if (!timetable) {
         >
           <Box>
             <Typography variant="h4" component="h1" gutterBottom>
-              {timetable.title}
+              {currentTimetable?.title || 'Edit Timetable'}
             </Typography>
             <Typography variant="subtitle1" color="text.secondary">
-              {format(new Date(timetable.startDate), 'MMM d, yyyy')} - {format(new Date(timetable.endDate), 'MMM d, yyyy')}
+              {currentTimetable ? `${format(new Date(currentTimetable.startDate), 'MMM d, yyyy')} - ${format(new Date(currentTimetable.endDate), 'MMM d, yyyy')}` : 'Loading...'}
             </Typography>
           </Box>
           
@@ -1078,8 +1102,8 @@ if (!timetable) {
               scheduledCourses={scheduledCourses}
               onCourseDrop={handleCourseDrop}
               onRemoveCourse={handleRemoveCourse}
-              startDate={timetable?.startDate ? new Date(timetable.startDate) : undefined}
-              endDate={timetable?.endDate ? new Date(timetable.endDate) : undefined}
+              startDate={currentTimetable?.startDate ? new Date(currentTimetable.startDate) : undefined}
+              endDate={currentTimetable?.endDate ? new Date(currentTimetable.endDate) : undefined}
             />
           </Grid>
         </Grid>
