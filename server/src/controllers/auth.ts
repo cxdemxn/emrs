@@ -63,11 +63,32 @@ export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
+    // Find user in User table (for admin)
     Logger.debug(`Attempting to authenticate user: ${req.body.email}`);
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { email }
     });
+
+    // If not found in User table, check Student table
+    if (!user) {
+      Logger.debug(`User not found in User table, checking Student table for: ${req.body.email}`);
+      const student = await prisma.student.findUnique({
+        where: { email }
+      });
+
+      if (student) {
+        // Convert student to user format for authentication
+        user = {
+          id: student.id,
+          email: student.email,
+          password: student.password,
+          name: student.name,
+          role: 'STUDENT' as const,
+          createdAt: student.createdAt,
+          updatedAt: student.updatedAt
+        };
+      }
+    }
 
     if (!user) {
       Logger.warn(`Login attempt with non-existent email: ${req.body.email}`);
