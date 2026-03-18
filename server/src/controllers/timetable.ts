@@ -195,7 +195,11 @@ export const getTimetableByDepartmentAndLevel = async (req: Request, res: Respon
             }
           },
           include: {
-            course: true
+            course: {
+              include: {
+                department: true
+              }
+            }
           },
           orderBy: {
             date: 'asc'

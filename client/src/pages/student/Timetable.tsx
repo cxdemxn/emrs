@@ -260,7 +260,7 @@ const StudentTimetable: React.FC = () => {
                           key={slot.id}
                           className={
                             student && 
-                            slot.course.department.id === student.departmentId && 
+                            slot.course.department?.id === student.departmentId && 
                             slot.course.level === student.level 
                               ? 'my-exam' 
                               : ''
@@ -269,7 +269,7 @@ const StudentTimetable: React.FC = () => {
                           <td>{timeSlotMap[slot.timeSlot]}</td>
                           <td>{slot.course.code}</td>
                           <td>{slot.course.title}</td>
-                          <td>{slot.course.department.name}</td>
+                          <td>{slot.course.department?.name || 'N/A'}</td>
                           <td>{slot.course.level}</td>
                         </tr>
                       ))}
