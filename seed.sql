@@ -739,29 +739,12 @@ INSERT INTO "ExamSlot" (id, date, "timeSlot", "courseId", "timetableId", "create
   (gen_random_uuid(),'2025-01-17 13:00:00','SLOT_1_3','edu-204','ttb-2425-s1',NOW(),NOW()),
   (gen_random_uuid(),'2025-01-17 13:00:00','SLOT_1_3','ged-204','ttb-2425-s1',NOW(),NOW());
 
--- 5th 200L (CSC, ACC, LAW, PSC)
+-- 5th 200L courses
 INSERT INTO "ExamSlot" (id, date, "timeSlot", "courseId", "timetableId", "createdAt", "updatedAt") VALUES
   (gen_random_uuid(),'2025-01-17 15:00:00','SLOT_3_5','csc-205','ttb-2425-s1',NOW(),NOW()),
   (gen_random_uuid(),'2025-01-17 15:00:00','SLOT_3_5','eee-205','ttb-2425-s1',NOW(),NOW()),
   (gen_random_uuid(),'2025-01-17 15:00:00','SLOT_3_5','acc-205','ttb-2425-s1',NOW(),NOW()),
   (gen_random_uuid(),'2025-01-17 15:00:00','SLOT_3_5','law-205','ttb-2425-s1',NOW(),NOW()),
-  (gen_random_uuid(),'2025-01-17 15:00:00','SLOT_3_5','psc-204','ttb-2425-s1',NOW(),NOW());
--- note: psc-204 already inserted above, skip; same for ged-204.
--- SLOT_3_5 Fri 17 only gets the ones not yet scheduled
--- (The above 5th-course block is already correct from SLOT_1_3. The SLOT_3_5 line above
---  re-references psc-204 which is a duplicate — remove it.)
-
--- ============================================================
--- CORRECTION: remove the duplicate psc-204 row above.
--- The clean version is below — Week 2 Fri SLOT_3_5 is only
--- for remaining courses not yet covered:
--- ============================================================
--- (Already inserted: csc-205, eee-205, acc-205, law-205 in SLOT_3_5 above are fine.
---  psc-204 was already done in SLOT_1_3 so it is omitted here.)
--- We use a DO block to safely skip duplicates on (courseId, timetableId):
--- Actually, since IDs are gen_random_uuid() the uniqueness is on (courseId,timetableId).
--- Re-inserting csc-206 here is fine:
-INSERT INTO "ExamSlot" (id, date, "timeSlot", "courseId", "timetableId", "createdAt", "updatedAt") VALUES
   (gen_random_uuid(),'2025-01-17 15:00:00','SLOT_3_5','csc-206','ttb-2425-s1',NOW(),NOW());
 
 
@@ -889,7 +872,6 @@ INSERT INTO "ExamSlot" (id, date, "timeSlot", "courseId", "timetableId", "create
 INSERT INTO "ExamSlot" (id, date, "timeSlot", "courseId", "timetableId", "createdAt", "updatedAt") VALUES
   (gen_random_uuid(),'2025-01-24 15:00:00','SLOT_3_5','csc-305','ttb-2425-s1',NOW(),NOW()),
   (gen_random_uuid(),'2025-01-24 15:00:00','SLOT_3_5','eee-305','ttb-2425-s1',NOW(),NOW()),
-  (gen_random_uuid(),'2025-01-24 15:00:00','SLOT_3_5','che-304','ttb-2425-s1',NOW(),NOW()),
   (gen_random_uuid(),'2025-01-24 15:00:00','SLOT_3_5','acc-305','ttb-2425-s1',NOW(),NOW()),
   (gen_random_uuid(),'2025-01-24 15:00:00','SLOT_3_5','law-305','ttb-2425-s1',NOW(),NOW()),
   (gen_random_uuid(),'2025-01-24 15:00:00','SLOT_3_5','eng-305','ttb-2425-s1',NOW(),NOW()),
