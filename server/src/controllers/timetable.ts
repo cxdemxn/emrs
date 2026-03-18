@@ -725,22 +725,22 @@ export const autoScheduleExams = async (req: Request, res: Response) => {
     }
 
     // ─── 6) Group Courses by "<deptId>-<level>" ─────────────────────────
-    interface CourseInfo {
-      id: string;
-      code: string;
-      title: string; // Changed from name to title to match actual course structure
-      departmentId: string; // Changed from number to string to match actual type
-      level: number;
-      department: { id: string; name: string }; // Changed id from number to string
-    }
-    const coursesByDeptLevel = new Map<string, CourseInfo[]>();
-    for (const c of courses as CourseInfo[]) {
-      const key = `${c.departmentId}-${c.level}`;
-      if (!coursesByDeptLevel.has(key)) {
-        coursesByDeptLevel.set(key, []);
-      }
-      coursesByDeptLevel.get(key)!.push(c);
-    }
+interface CourseInfo {
+  id: string;
+  code: string;
+  title: string; // Changed from name to title to match actual course structure
+  departmentId: string; // Changed from number to string to match actual type
+  level: number;
+  department: { id: string; name: string }; // Changed id from number to string
+}
+const coursesByDeptLevel = new Map<string, { deptId: string; lvl: number; courses: CourseInfo[] }>();
+for (const c of courses as CourseInfo[]) {
+  const key = `${c.departmentId}::${c.level}`; // use '::' as separator — safe since UUIDs never contain '::'
+  if (!coursesByDeptLevel.has(key)) {
+    coursesByDeptLevel.set(key, { deptId: c.departmentId, lvl: c.level, courses: [] });
+  }
+  coursesByDeptLevel.get(key)!.courses.push(c);
+}
 
     // ─── 7) Build dateIndex map (O(1) lookup) & skipSet ─────────────────
 const dateIndexMap = new Map<string, number>();
@@ -768,11 +768,10 @@ const scheduledExams: Array<{
 const unscheduled: CourseInfo[] = [];
 const allTimeSlots: TimeSlot[] = Object.values(TimeSlot) as TimeSlot[];
 
-for (const [deptLevelKey, courseList] of coursesByDeptLevel.entries()) {
-  const [deptIdStr, lvlStr] = deptLevelKey.split('-');
-  const deptId = parseInt(deptIdStr, 10);
-  const lvl = parseInt(lvlStr, 10);
+for (const [, { deptId, lvl, courses: courseList }] of coursesByDeptLevel.entries()) {
   const shortDeptLvl = `${deptId}-${lvl}`;
+  // shortDeptLvl now exactly matches what step 5 writes into examCountsOnDate
+  // and usedSlotsByDeptLevelOnDate, e.g. "dep-cve-001-100"
 
   const shuffledCourses = fisherYates(courseList);
 
