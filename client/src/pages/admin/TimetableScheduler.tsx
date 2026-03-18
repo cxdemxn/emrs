@@ -687,7 +687,7 @@ const handleAutoSchedule = async () => {
 };
   
   // Handle course drop (drag and drop scheduling)
-  const handleCourseDrop = async (courseId: string, day: Date, timeSlot: string) => {
+  const handleCourseDrop = async (courseId: string, day: Date, timeSlot: string, sourceSlotId?: string) => {
     // Find the course object
     const course = Array.isArray(courses) ? courses.find((c: Course) => c.id === courseId) : undefined;
     if (!course) return;
@@ -716,7 +716,16 @@ const handleAutoSchedule = async () => {
         return;
       }
       
-      // Call API to add exam slot
+      // If this is a MOVE (course already has a slot), delete the old slot first
+      if (sourceSlotId) {
+        await axios.delete(`${API_URL}/timetables/${currentTimetable.id}/exam-slots/${sourceSlotId}`);
+        // Remove from local state immediately
+        if (typeof setScheduledCourses === 'function') {
+          setScheduledCourses(prev => prev.filter(sc => sc.id !== sourceSlotId));
+        }
+      }
+      
+      // Now add to the new slot
       const response = await axios.post<ExamSlotResponse>(
         `${API_URL}/timetables/${currentTimetable.id}/exam-slots`,
         {
@@ -749,12 +758,13 @@ const handleAutoSchedule = async () => {
       if (typeof setSnackbarMessage === 'function' && 
           typeof setSnackbarSeverity === 'function' && 
           typeof setSnackbarOpen === 'function') {
+        const message = sourceSlotId ? 'Course moved successfully' : 'Course scheduled successfully';
         if (conflictStatus === 'warning') {
-          setSnackbarMessage('Course scheduled with warning: 3 exams on same day for this department-level');
+          setSnackbarMessage(`${message} (warning: 3 exams on same day for this department-level)`);
           setSnackbarSeverity('warning');
           setSnackbarOpen(true);
         } else {
-          setSnackbarMessage('Course scheduled successfully');
+          setSnackbarMessage(message);
           setSnackbarSeverity('success');
           setSnackbarOpen(true);
         }

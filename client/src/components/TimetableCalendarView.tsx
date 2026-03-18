@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Box, Typography, Paper, IconButton, Tooltip } from '@mui/material';
+import { useDrag } from 'react-dnd';
 import { format } from 'date-fns';
 import CloseIcon from '@mui/icons-material/Close';
 import WarningIcon from '@mui/icons-material/Warning';
@@ -37,7 +38,7 @@ interface CalendarCellProps {
 
 interface TimetableCalendarViewProps {
   scheduledCourses: ScheduledCourse[];
-  onCourseDrop?: (courseId: string, day: Date, timeSlot: string) => void;
+  onCourseDrop?: (courseId: string, day: Date, timeSlot: string, sourceSlotId?: string) => void;
   onRemoveCourse?: (scheduledCourseId: string) => void;
   readOnly?: boolean;
   startDate?: Date;
@@ -53,8 +54,70 @@ export const TIME_SLOT_MAP: Record<string, string> = {
   'SLOT_3_5': '3:00 PM - 5:00 PM'
 };
 
+// Item type for drag and drop
+const ItemTypes = {
+  COURSE: 'course'
+};
+
 // Department level colors for consistent coloring
 const DEPARTMENT_LEVEL_COLORS: Record<string, string> = {};
+
+// Draggable Scheduled Course Component
+const DraggableScheduledCourse: React.FC<{
+  scheduledCourse: ScheduledCourse;
+  index: number;
+  totalInSlot: number;
+  departmentLevelColors: Record<string, string>;
+  onRemove?: (scheduledCourseId: string) => void;
+  readOnly?: boolean;
+}> = ({ scheduledCourse, index, totalInSlot, departmentLevelColors, onRemove, readOnly }) => {
+  const [{ isDragging }, drag] = useDrag(() => ({
+    type: ItemTypes.COURSE,
+    item: { id: scheduledCourse.course.id, sourceSlotId: scheduledCourse.id },
+    collect: monitor => ({ isDragging: !!monitor.isDragging() })
+  }));
+
+  const dragRef = useRef<HTMLDivElement>(null);
+  drag(dragRef);
+
+  return (
+    <Box 
+      ref={dragRef}
+      sx={{
+        mb: index < totalInSlot - 1 ? 1 : 0,
+        borderLeft: '4px solid',
+        borderLeftColor: departmentLevelColors[`dept-${scheduledCourse.course.department.id}-${scheduledCourse.course.level}`] || '#9e9e9e',
+        pl: 1,
+        borderRadius: '2px',
+        position: 'relative',
+        opacity: isDragging ? 0.4 : 1,
+        cursor: readOnly ? 'default' : 'move'
+      }}
+    >
+      <Typography variant="subtitle2" fontWeight="bold" noWrap>
+        {scheduledCourse.course.code}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" noWrap>
+        {scheduledCourse.course.title}
+      </Typography>
+      
+      {!readOnly && onRemove && (
+        <IconButton
+          size="small"
+          onClick={() => onRemove(scheduledCourse.id)}
+          sx={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            padding: '2px'
+          }}
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      )}
+    </Box>
+  );
+};
 
 // Calendar Cell Component
 const CalendarCell: React.FC<CalendarCellProps> = ({
@@ -160,39 +223,15 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
           }}
         >
           {scheduledCoursesForSlot.map((sc, index) => (
-            <Box 
+            <DraggableScheduledCourse
               key={sc.id}
-              sx={{
-                mb: index < scheduledCoursesForSlot.length - 1 ? 1 : 0,
-                borderLeft: '4px solid',
-                borderLeftColor: departmentLevelColors[`dept-${sc.course.department.id}-${sc.course.level}`] || '#9e9e9e',
-                pl: 1,
-                borderRadius: '2px',
-                position: 'relative'
-              }}
-            >
-              <Typography variant="subtitle2" fontWeight="bold" noWrap>
-                {sc.course.code}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" noWrap>
-                {sc.course.title}
-              </Typography>
-              
-              {!readOnly && onRemove && (
-                <IconButton
-                  size="small"
-                  onClick={() => onRemove(sc.id)}
-                  sx={{
-                    position: 'absolute',
-                    top: 0,
-                    right: 0,
-                    padding: '2px'
-                  }}
-                >
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              )}
-            </Box>
+              scheduledCourse={sc}
+              index={index}
+              totalInSlot={scheduledCoursesForSlot.length}
+              departmentLevelColors={departmentLevelColors}
+              onRemove={onRemove}
+              readOnly={readOnly}
+            />
           ))}
           
           {/* Conflict indicator - only show at the slot level if there are conflicts */}
@@ -372,7 +411,7 @@ const TimetableCalendarView: React.FC<TimetableCalendarViewProps> = ({
                     day={day}
                     timeSlot={timeSlot}
                     scheduledCourses={scheduledCourses}
-                    onDrop={(courseId) => onCourseDrop(courseId, day, timeSlot)}
+                    onDrop={(courseId, sourceSlotId) => onCourseDrop && onCourseDrop(courseId, day, timeSlot, sourceSlotId)}
                   >
                     <CalendarCell
                       day={day}

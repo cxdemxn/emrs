@@ -27,7 +27,7 @@ interface ScheduledCourse {
 interface DroppableTimeSlotProps {
   day: Date;
   timeSlot: string;
-  onDrop: (courseId: string) => void;
+  onDrop: (courseId: string, sourceSlotId?: string) => void;
   scheduledCourses: ScheduledCourse[];
   onRemove: (scheduledCourseId: string) => void;
   departmentLevelColors: Record<string, string>;
@@ -104,9 +104,9 @@ export const DroppableTimeSlot: React.FC<DroppableTimeSlotProps> = (props) => {
   }, [day, scheduledCourses, scheduledCoursesForSlot]);
 
   // Set up drop target
-  const [{ isOver, canDrop }, dropRef] = useDrop<{ id: string }, void, { isOver: boolean; canDrop: boolean }>({
+  const [{ isOver, canDrop }, dropRef] = useDrop<{ id: string; sourceSlotId?: string }, void, { isOver: boolean; canDrop: boolean }>({
     accept: ItemTypes.COURSE,
-    drop: (item: { id: string }) => onDrop(item.id),
+    drop: (item) => onDrop(item.id, item.sourceSlotId),
     canDrop: () => scheduledCoursesForSlot.length < 3, // Limit to 3 exams per slot
     collect: monitor => ({
       isOver: !!monitor.isOver(),
@@ -130,20 +130,10 @@ export const DroppableTimeSlot: React.FC<DroppableTimeSlotProps> = (props) => {
       timeSlot: sc.timeSlot
     })));
   }, [day, timeSlot, scheduledCoursesForSlot, hasConflict, examCount, scheduledCourses]);
-
-  // Create a div element ref
-  const boxRef = React.useRef<HTMLDivElement>(null);
-  
-  // Connect the drop ref to the box ref
-  React.useEffect(() => {
-    if (boxRef.current) {
-      dropRef(boxRef.current);
-    }
-  }, [dropRef]);
   
   return (
     <Box
-      ref={boxRef}
+      ref={dropRef as any}
       sx={{
         height: '100px',
         border: '1px solid #e0e0e0',

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { useDrop } from 'react-dnd';
 import { Box } from '@mui/material';
 // No need to import getDepartmentLevelColor as it's not used here
@@ -31,7 +31,7 @@ interface ScheduledCourse {
 interface DroppableCalendarCellProps {
   day: Date;
   timeSlot: string;
-  onDrop: (courseId: string) => void;
+  onDrop: (courseId: string, sourceSlotId?: string) => void;
   scheduledCourses: ScheduledCourse[];
   // These props are passed to children, not used directly in this component
   children: React.ReactNode;
@@ -70,29 +70,19 @@ const DroppableCalendarCell: React.FC<DroppableCalendarCellProps> = ({
   }, [day, timeSlot, scheduledCourses]);
 
   // Set up drop target
-  const [{ isOver, canDrop }, dropRef] = useDrop<{ id: string }, void, { isOver: boolean; canDrop: boolean }>({
+  const [{ isOver, canDrop }, dropRef] = useDrop<{ id: string; sourceSlotId?: string }, void, { isOver: boolean; canDrop: boolean }>({
     accept: ItemTypes.COURSE,
-    drop: (item: { id: string }) => onDrop(item.id),
+    drop: (item) => onDrop(item.id, item.sourceSlotId),
     canDrop: () => scheduledCoursesForSlot.length < 3, // Limit to 3 exams per slot
     collect: monitor => ({
       isOver: !!monitor.isOver(),
       canDrop: !!monitor.canDrop()
     })
   });
-
-  // Create a div element ref
-  const boxRef = useRef<HTMLDivElement>(null);
-  
-  // Connect the drop ref to the box ref
-  useEffect(() => {
-    if (boxRef.current) {
-      dropRef(boxRef.current);
-    }
-  }, [dropRef]);
   
   return (
     <Box
-      ref={boxRef}
+      ref={dropRef as any}
       sx={{
         backgroundColor: isOver && canDrop 
           ? 'rgba(33, 150, 243, 0.1)' 
